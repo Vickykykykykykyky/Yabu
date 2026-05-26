@@ -1,0 +1,2 @@
+# 复制为 .dev.vars（勿提交 git）
+# ALLOWED_ORIGIN=http://localhost:5173

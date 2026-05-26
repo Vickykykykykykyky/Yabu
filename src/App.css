@@ -1,0 +1,101 @@
+.app {
+  min-height: 100vh;
+  height: 100vh;
+  background: #ffffff;
+  color: #262626;
+  overflow: hidden;
+  position: relative;
+}
+
+.app__persist-warning {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.6rem 1rem;
+  max-width: min(90vw, 420px);
+  font-size: 0.8rem;
+  color: #7c2d12;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 0.5rem;
+  z-index: 300;
+  text-align: center;
+}
+
+.app__main {
+  height: 100%;
+  min-height: 100vh;
+  margin-right: 72px;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.5rem 5rem;
+  box-sizing: border-box;
+}
+
+.app__header {
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+}
+
+.app__logo {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1a1a2e;
+}
+
+.app__subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.app__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.app__content--home {
+  overflow: hidden;
+}
+
+.app__columns {
+  display: flex;
+  flex: 1;
+  gap: 1rem;
+  align-items: stretch;
+  min-height: 0;
+  height: 100%;
+}
+
+.app__main--home .user-column {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .app__columns {
+    flex-direction: column;
+  }
+
+  .app__main {
+    margin-right: 0;
+    padding: 1rem 1rem 5rem;
+    padding-right: calc(72px + 1rem);
+    overflow: auto;
+  }
+
+  .app__content--home {
+    overflow: auto;
+  }
+
+  .app__main--home .user-column {
+    min-height: 50vh;
+  }
+}

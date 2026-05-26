@@ -1,0 +1,17 @@
+# 本地 API：npm run dev:api  →  http://127.0.0.1:8787
+# 前端代理：Vite 把 /api 转发到 Worker
+name = "yabu-api"
+main = "worker/index.ts"
+compatibility_date = "2025-03-01"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "yabu-photos"
+preview_bucket_name = "yabu-photos-preview"
+
+[dev]
+port = 8787
+local_protocol = "http"
+
+# 生产环境可在 Dashboard 创建同名 bucket，或：
+# npx wrangler r2 bucket create yabu-photos

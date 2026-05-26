@@ -1,0 +1,13 @@
+# https://supabase.com/docs/guides/cli/config
+project_id = "pmajmgryddjdgstpfcfn"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
