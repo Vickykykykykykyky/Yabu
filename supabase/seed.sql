@@ -5,7 +5,10 @@ insert into public.profiles (id, display_name, avatar_url, role)
 values
   ('user-1', '小蓝', '', 'member'),
   ('user-2', '小橙', '', 'member'),
-  ('user-3', '小绿', '', 'member')
+  ('user-3', '小绿', '', 'member'),
+  ('user-4', '小红', '', 'member'),
+  ('user-5', '小紫', '', 'member'),
+  ('user-6', '小黄', '', 'member')
 on conflict (id) do update set
   display_name = excluded.display_name,
   role = excluded.role;

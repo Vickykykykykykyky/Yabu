@@ -1,49 +1,32 @@
 # Yabu
 
-照片分享首页：三栏用户墙 + 右侧导航。支持本地存储或 Cloudflare R2。
+照片分享首页：三栏用户墙 + 右侧导航。默认 **Supabase Database + Supabase Storage**，可选 Cloudflare R2。
 
-## Supabase（用户 / 管理员）
+## Supabase（推荐：用户资料 + 照片存 Storage）
 
 项目已指向 [pmajmgryddjdgstpfcfn](https://supabase.com/dashboard/project/pmajmgryddjdgstpfcfn)。
 
-**还需你完成一步（我无法代你登录 Dashboard）：**
+1. [Settings → API](https://supabase.com/dashboard/project/pmajmgryddjdgstpfcfn/settings/api) 复制 **Publishable / anon** 到 `.env.local`（`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`）
+2. [SQL Editor](https://supabase.com/dashboard/project/pmajmgryddjdgstpfcfn/sql/new) 运行 **`supabase/setup-all.sql`** 一次即可（内含表、`yabu-photos` 桶与策略，包含多图帖子 `posts/post_images` 与关注 `follows`）。若你之前已跑过旧版 SQL，可只补跑 **`supabase/setup-posts.sql`**（补齐帖子/关注表）或 **`supabase/setup-storage.sql`**（仅补桶与策略）。
+3. **不要**在 `.env.local` 开启 `VITE_USE_R2`（或注释掉该行）
+4. `npm run dev` 重启，点 **+** 上传；图片在 Dashboard **Storage → yabu-photos**，公开 URL 会写入 `photos` 表，页面用 `<img src="...">` 显示。
 
-1. [Settings → API](https://supabase.com/dashboard/project/pmajmgryddjdgstpfcfn/settings/api) 复制 **anon public**，粘贴到 `.env.local` 里替换 `PASTE_ANON_KEY_HERE`
-2. [SQL Editor](https://supabase.com/dashboard/project/pmajmgryddjdgstpfcfn/sql/new) 运行 `supabase/setup-all.sql`，再运行 **`supabase/setup-storage.sql`**（照片文件存 Storage）
-3. `npm run dev` 重启
+或：`VITE_SUPABASE_ANON_KEY=... npm run setup:supabase`（仍需在网页里跑一次 `setup-storage.sql`）
 
-或：`VITE_SUPABASE_ANON_KEY=eyJ... npm run setup:supabase`（可选加 `SUPABASE_DB_PASSWORD` 自动 psql 建表）
+管理员与迁移说明见 **[docs/SUPABASE.md](docs/SUPABASE.md)**（含多图帖子迁移指南 `docs/POSTS_MIGRATION.md`）。
 
-管理员与迁移说明见 **[docs/SUPABASE.md](docs/SUPABASE.md)**。
-
-## 本地开发（仅前端）
+## 本地开发（仅前端 → Supabase Storage）
 
 ```bash
 npm install
 npm run dev
 ```
 
-打开 http://localhost:5173。照片默认存在浏览器 `localStorage`。
+打开 http://localhost:5173。未配置 Supabase 时照片在浏览器 `localStorage`；配置后走数据库 + Storage。
 
-## Supabase + R2 一起用（推荐）
+## 可选：Supabase + Cloudflare R2
 
-用户资料在 **Supabase**，**照片文件在 R2**：
-
-`.env.local` 同时保留 Supabase 变量，并加上：
-
-```
-VITE_USE_R2=true
-```
-
-然后：
-
-```bash
-npm run dev:all
-```
-
-上传走 R2；`photos` 表里只存 `/api/photos/...` 链接。不必再跑 `setup-storage.sql`。
-
-## 本地开发 + Cloudflare R2
+用户资料仍在 **Supabase**，图片文件放 **R2**：`.env.local` 加 `VITE_USE_R2=true`，`npm run dev:all`。需先在 Cloudflare 开通 R2（否则 API 报错 `10042`）。不必跑 `setup-storage.sql`。
 
 ### 1. 登录 Cloudflare
 

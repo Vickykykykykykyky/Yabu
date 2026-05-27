@@ -1,0 +1,188 @@
+.photo-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.photo-stack__empty {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  border: 2px dashed #e5e7eb;
+  border-radius: 1.25rem;
+  background: #ffffff;
+}
+
+/* 底部多留空：扇形以底边为轴旋转，角会探出容器 */
+.photo-stack__deck {
+  --stack-inset-x: 1.75rem;
+  --stack-inset-y: 0.75rem;
+  --stack-fan-bottom: 2.75rem;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0.5rem var(--stack-inset-x) var(--stack-fan-bottom);
+  overflow: visible;
+}
+
+.photo-stack__deck--compact {
+  --stack-inset-x: 1.35rem;
+  --stack-fan-bottom: 2.5rem;
+}
+
+.photo-stack__card {
+  position: absolute;
+  bottom: var(--stack-fan-bottom);
+  left: 50%;
+  height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.5rem);
+  max-height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.5rem);
+  width: auto;
+  max-width: calc(100% - var(--stack-inset-x) * 2);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  transition:
+    transform 0.35s cubic-bezier(0.25, 0.9, 0.35, 1),
+    box-shadow 0.25s ease;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.06),
+    0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.photo-stack__card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.photo-stack__card--top {
+  cursor: default;
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.05),
+    0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.photo-stack__card--behind:hover {
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.06),
+    0 8px 20px rgba(233, 69, 96, 0.18),
+    0 0 0 2px rgba(233, 69, 96, 0.3);
+}
+
+/* 超出 3 张时，后排用阴影卡片暗示还有更多 */
+.photo-stack__shadow {
+  position: absolute;
+  bottom: var(--stack-fan-bottom);
+  left: 50%;
+  height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.85rem);
+  max-height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.85rem);
+  width: auto;
+  max-width: calc(100% - var(--stack-inset-x) * 2 - 0.5rem);
+  aspect-ratio: 5 / 7;
+  border-radius: 10px;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  background: linear-gradient(160deg, #e5e7eb 0%, #c4c9d4 55%, #b8bec8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.05),
+    0 6px 16px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    transform 0.35s cubic-bezier(0.25, 0.9, 0.35, 1),
+    opacity 0.25s ease;
+}
+
+.photo-stack__deck--compact .photo-stack__card {
+  height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.35rem);
+  max-height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.35rem);
+}
+
+.photo-stack__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1a2e;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.photo-stack__nav:hover {
+  background: #fff;
+  transform: translateY(-50%) scale(1.06);
+}
+
+.photo-stack__nav--prev {
+  left: 0.15rem;
+}
+
+.photo-stack__nav--next {
+  right: 0.15rem;
+}
+
+.photo-stack__footer {
+  flex-shrink: 0;
+  padding-top: 0.15rem;
+}
+
+.photo-stack__footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.photo-stack__dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.photo-stack__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.photo-stack__dot--active {
+  background: #e94560;
+  transform: scale(1.25);
+}
+
+.photo-stack__counter {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}

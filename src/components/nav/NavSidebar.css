@@ -131,30 +131,71 @@
   max-width: 120px;
 }
 
-.nav-sidebar__item--profile {
+.nav-sidebar__user {
   margin-top: auto;
   flex-shrink: 0;
-  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.25rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 0.65rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: #1a1a1a;
+  min-height: 52px;
 }
 
-.nav-sidebar__avatar {
-  width: 24px;
-  height: 24px;
+.nav-sidebar__user:hover {
+  background: #fafafa;
+}
+
+.nav-sidebar__user--active {
+  background: #fff5f7;
+  font-weight: 600;
+}
+
+.nav-sidebar__user-avatar {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
   background: linear-gradient(135deg, #e94560, #f5a623);
   display: grid;
   place-items: center;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #fff;
 }
 
-.nav-sidebar__avatar img {
+.nav-sidebar__user-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.nav-sidebar__user-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  max-width: 0;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  transition:
+    opacity 0.15s ease,
+    max-width 0.2s ease;
+}
+
+.nav-sidebar--expanded .nav-sidebar__user-name,
+.nav-sidebar--pinned .nav-sidebar__user-name {
+  opacity: 1;
+  max-width: 120px;
 }
 
 @media (hover: none) {

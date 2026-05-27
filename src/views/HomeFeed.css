@@ -1,0 +1,34 @@
+.home-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding-bottom: 3rem;
+}
+
+.home-feed__row {
+  display: flex;
+  flex: none;
+  gap: 1.25rem;
+  align-items: stretch;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  min-height: min(70vh, 640px);
+  height: min(70vh, 640px);
+  overflow: hidden;
+  border-radius: 1.25rem;
+  padding-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+
+.home-feed__row:nth-child(2) {
+  z-index: 1;
+}
+
+@media (max-width: 900px) {
+  .home-feed__row {
+    flex-direction: column;
+    height: auto;
+    min-height: min(62vh, 560px);
+  }
+}

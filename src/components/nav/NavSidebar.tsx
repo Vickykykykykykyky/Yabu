@@ -115,19 +115,19 @@ export function NavSidebar({
 
       <button
         type="button"
-        className={`nav-sidebar__item nav-sidebar__item--profile ${activeView === 'profile' ? 'nav-sidebar__item--active' : ''}`}
+        className={`nav-sidebar__user ${activeView === 'profile' ? 'nav-sidebar__user--active' : ''}`}
         onClick={() => onNavigate('profile')}
         aria-current={activeView === 'profile' ? 'page' : undefined}
-        title={!expanded ? '个人主页' : undefined}
+        title={!expanded ? activeUser.displayName : undefined}
       >
-        <span className="nav-sidebar__avatar">
+        <span className="nav-sidebar__user-avatar">
           {activeUser.avatarUrl ? (
             <img src={activeUser.avatarUrl} alt="" />
           ) : (
             <span>{getInitials(activeUser.displayName)}</span>
           )}
         </span>
-        <span className="nav-sidebar__label">个人主页</span>
+        <span className="nav-sidebar__user-name">{activeUser.displayName}</span>
       </button>
     </aside>
   )

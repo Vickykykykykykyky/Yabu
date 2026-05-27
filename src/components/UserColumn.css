@@ -4,32 +4,27 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 1rem;
-  padding: 1.25rem;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0.75rem;
   height: 100%;
   min-height: 0;
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
   border: 2px solid #e5e7eb;
   border-radius: 1.25rem;
   background: #fafafa;
-  cursor: pointer;
   text-align: left;
   color: inherit;
-  font: inherit;
   transition:
     border-color 0.2s,
     background 0.2s,
     box-shadow 0.2s;
 }
 
-.user-column:hover {
+.user-column:not(.user-column--active):hover {
   background: #f3f4f6;
   border-color: #d1d5db;
-}
-
-.user-column--active {
-  border-color: #e94560;
-  background: #fff5f7;
-  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.12);
 }
 
 .user-column__header {
@@ -37,6 +32,19 @@
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
+  width: 100%;
+  padding: 0;
+}
+
+.user-column--active {
+  z-index: 2;
+  border-color: #e94560;
+  background: #fff5f7;
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.12);
+}
+
+.user-column:hover {
+  z-index: 2;
 }
 
 .user-column__avatar {
@@ -66,59 +74,22 @@
   min-width: 0;
 }
 
-.user-column__id {
-  font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
-  color: #9ca3af;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.user-column__badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #e94560;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .user-column__name {
   font-size: 1rem;
   font-weight: 600;
   color: #1a1a2e;
-}
-
-.user-column__stack {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  margin-top: 0.5rem;
-}
-
-.user-column__empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  margin: 0;
-  color: #9ca3af;
-  font-size: 0.9rem;
-  border: 2px dashed #e5e7eb;
-  border-radius: 1rem;
-  background: #ffffff;
-}
-
-.user-column__photo {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: calc(100% - 24px);
-  aspect-ratio: 4 / 5;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.12),
-    0 0 0 1px rgba(0, 0, 0, 0.06);
-}
-
-.user-column__photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
 }
 
 .user-column__count {

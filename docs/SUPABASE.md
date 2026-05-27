@@ -5,7 +5,9 @@
 | 数据 | 未配置 Supabase | 配置 Supabase 后 |
 |------|-----------------|------------------|
 | 三栏用户、昵称、头像 | 浏览器 localStorage | `profiles` 表 |
-| 照片文件 | localStorage 或 Cloudflare R2 | R2/本地 URL 存在 `photos` 表 |
+| 照片文件 | localStorage | **Supabase Storage**（`yabu-photos` 桶）或可选 R2，URL 在 `photos` 表 |
+| 多图帖子（新） | localStorage | `posts` + `post_images` 表 |
+| 关注/粉丝（新） | 无 | `follows` 表（粉丝数实时统计） |
 | 消息、通知 | localStorage | 仍 localStorage（可后续迁表） |
 | 登录账号 | 无 | Supabase Auth `auth.users` |
 
@@ -27,21 +29,17 @@ cp .env.example .env.local
 
 ---
 
-## 二、建表（执行 migration）
+## 二、建表（执行 SQL）
 
-Dashboard → **SQL Editor** → 新建查询，粘贴并运行：
+Dashboard → **SQL Editor** → 新建查询，粘贴并运行（推荐一键全量）：
 
-`supabase/migrations/20250326000000_initial_schema.sql`
+`supabase/setup-all.sql`
 
-再运行种子数据：
+它会创建（含策略与 Storage 桶）：`profiles`、`photos`、`posts`、`post_images`、`follows`，并 seed 6 个用户。
 
-`supabase/seed.sql`
+如果你只想在已有库上补齐多图帖子与关注表，可运行：
 
-再运行（**照片文件存 Storage，避免写入失败**）：
-
-`supabase/setup-storage.sql`
-
-会得到三条用户：`user-1` 小蓝、`user-2` 小橙、`user-3` 小绿。
+`supabase/setup-posts.sql`
 
 ---
 
@@ -97,13 +95,46 @@ where id = 'user-1';
 auth.users (Supabase 登录，可选)
     ↑ auth_user_id
 profiles (id, display_name, avatar_url, role: member|admin)
-    ↑ profile_id
-photos (url 指向 R2 或 /api/photos/...)
+    ↑ profile_id                ↑ follower_id / followee_id
+photos (legacy 单图作品)        follows (关注关系，用于粉丝数)
+
+profiles ↑ profile_id
+posts (一条帖子，可含多图)
+    ↑ post_id
+post_images (多张图片 + sort_order + created_at)
 ```
 
 ---
 
-## 六、本地验证
+## 六、正式上线（切到 Supabase Auth）建议
+
+当前项目的“只输入名字”属于演示模式，数据库无法识别“当前请求用户是谁”，因此 `setup-all.sql` / `setup-posts.sql` 里默认包含了 **anon 可写** 的 dev 策略（`*_anon_dev`）。
+
+如果要上线（真正做到“只能改自己/删自己的作品/只能用自己的账号关注别人”）：
+
+1. 启用 Supabase Auth（邮箱/手机/匿名等均可）。
+2. `profiles.auth_user_id` 绑定到 `auth.users.id`。
+3. 删除/禁用所有 `*_anon_dev` 策略。
+4. 启用 `*_own`（authenticated）策略块（`setup-all.sql` 和 `setup-posts.sql` 都有模板）。
+
+多图帖子从旧表迁移到新表的说明见：`docs/POSTS_MIGRATION.md`。
+
+---
+
+## 七、注册（名字唯一）
+
+1. 前端打开 **注册** 页，输入未被占用的名字（2–24 字）。
+2. 若连接 Supabase，会调用 `register_profile` RPC 写入 `profiles` 并返回 `id`。
+3. 演示种子用户（小蓝、小橙…）只能 **登录**，不能重复注册。
+
+若注册报权限或函数不存在，在 SQL Editor 依次运行：
+
+- `supabase/auth-register.sql`
+- `supabase/register-profile.sql`
+
+---
+
+## 八、本地验证
 
 配置 `.env.local` 后刷新站点；若连接成功，首页用户来自数据库而非写死的默认值。
 

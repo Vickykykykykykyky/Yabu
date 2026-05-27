@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
+import { loadLocalUsers, saveLocalUsers } from '../lib/local-users'
 import { checkR2Health, isR2Enabled, listUserPhotos } from '../lib/r2-api'
 import {
+  deletePhotoInDb,
   fetchAllProfiles,
   insertPhotoInDb,
   updateProfileInDb,
 } from '../lib/supabase-profiles'
 import { isSupabaseEnabled } from '../lib/supabase'
 import { formatSupabaseError } from '../lib/supabase-errors'
+import { isValidPhotoUrl } from '../utils/photos'
+import { appendPhoto, removePhotoById, withSyncedPhotos } from '../utils/user-photos'
 import type { AppState, Message, Notification, UserProfile } from '../types'
 
 const STORAGE_KEY = 'yabu-app-state'
-
-const defaultUsers: UserProfile[] = [
-  { id: 'user-1', displayName: '小蓝', avatarUrl: '', photoUrls: [], role: 'member' },
-  { id: 'user-2', displayName: '小橙', avatarUrl: '', photoUrls: [], role: 'member' },
-  { id: 'user-3', displayName: '小绿', avatarUrl: '', photoUrls: [], role: 'member' },
-]
 
 const defaultMessages: Message[] = [
   {
@@ -47,10 +45,10 @@ const defaultNotifications: Notification[] = [
   },
 ]
 
-function defaultState(): AppState {
+function defaultState(loggedInUserId: string): AppState {
   return {
-    users: defaultUsers,
-    activeUserId: defaultUsers[0].id,
+    users: [],
+    activeUserId: loggedInUserId,
     messages: defaultMessages,
     notifications: defaultNotifications,
   }
@@ -87,43 +85,56 @@ function persistState(state: AppState): boolean {
   }
 }
 
-function loadState(): AppState {
+function loadPersistedMeta(): Pick<AppState, 'messages' | 'notifications'> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultState()
-
+    if (!raw) {
+      return {
+        messages: defaultMessages,
+        notifications: defaultNotifications,
+      }
+    }
     const parsed = JSON.parse(raw) as AppState
-    const base = {
-      activeUserId: parsed.activeUserId ?? defaultUsers[0].id,
+    return {
       messages: parsed.messages ?? defaultMessages,
       notifications: parsed.notifications ?? defaultNotifications,
     }
-
-    if (isSupabaseEnabled()) {
-      return { ...base, users: defaultUsers }
-    }
-
-    if (!parsed.users?.length) {
-      return { ...base, users: defaultUsers }
-    }
-
-    return {
-      ...base,
-      users: parsed.users.map((u) => ({
-        ...u,
-        photoUrls: isR2Enabled() ? [] : Array.isArray(u.photoUrls) ? u.photoUrls : [],
-      })),
-    }
   } catch {
-    return defaultState()
+    return {
+      messages: defaultMessages,
+      notifications: defaultNotifications,
+    }
   }
 }
 
-export function useAppState() {
-  const [state, setState] = useState<AppState>(loadState)
+async function loadUsers(): Promise<UserProfile[]> {
+  const users = isSupabaseEnabled() ? await fetchAllProfiles() : loadLocalUsers()
+  return users.map(withSyncedPhotos)
+}
+
+export function useAppState(loggedInUserId: string) {
+  const [state, setState] = useState<AppState>(() => ({
+    ...defaultState(loggedInUserId),
+    ...loadPersistedMeta(),
+  }))
   const [persistWarning, setPersistWarning] = useState<string | null>(null)
   const [r2Ready, setR2Ready] = useState(!isR2Enabled())
   const [supabaseReady, setSupabaseReady] = useState(!isSupabaseEnabled())
+  const [usersLoading, setUsersLoading] = useState(true)
+
+  const refetchUsers = useCallback(async () => {
+    const users = await loadUsers()
+    setState((prev) => ({
+      ...prev,
+      users,
+      activeUserId: loggedInUserId,
+    }))
+    return users
+  }, [loggedInUserId])
+
+  useEffect(() => {
+    setState((prev) => ({ ...prev, activeUserId: loggedInUserId }))
+  }, [loggedInUserId])
 
   useEffect(() => {
     const ok = persistState(state)
@@ -133,25 +144,24 @@ export function useAppState() {
   }, [state])
 
   useEffect(() => {
-    if (!isSupabaseEnabled()) return
-
     let cancelled = false
 
     ;(async () => {
+      setUsersLoading(true)
       try {
-        const users = await fetchAllProfiles()
+        const users = await loadUsers()
         if (cancelled) return
         setState((prev) => ({
           ...prev,
-          users: users.length ? users : defaultUsers,
-          activeUserId: users.some((u) => u.id === prev.activeUserId)
-            ? prev.activeUserId
-            : (users[0]?.id ?? defaultUsers[0].id),
+          users,
+          activeUserId: loggedInUserId,
         }))
-        setSupabaseReady(true)
-        if (!isR2Enabled()) setPersistWarning(null)
+        if (isSupabaseEnabled()) {
+          setSupabaseReady(true)
+          if (!isR2Enabled()) setPersistWarning(null)
+        }
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && isSupabaseEnabled()) {
           setSupabaseReady(false)
           setPersistWarning(
             err instanceof Error
@@ -159,16 +169,18 @@ export function useAppState() {
               : 'Supabase 连接失败，请检查 .env.local 与表是否已创建',
           )
         }
+      } finally {
+        if (!cancelled) setUsersLoading(false)
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loggedInUserId])
 
   useEffect(() => {
-    if (!isR2Enabled()) return
+    if (!isR2Enabled() || !supabaseReady) return
 
     let cancelled = false
 
@@ -185,21 +197,23 @@ export function useAppState() {
       }
 
       setR2Ready(true)
-      if (isSupabaseEnabled() && supabaseReady) setPersistWarning(null)
+      if (isSupabaseEnabled()) setPersistWarning(null)
 
       try {
-        const usersWithPhotos = await Promise.all(
-          state.users.map(async (u) => {
-            const photos = await listUserPhotos(u.id)
-            const r2Urls = photos.map((p) => p.url)
-            // R2 有图用 R2；否则保留 Supabase 里旧数据（如 base64）
-            const photoUrls = r2Urls.length > 0 ? r2Urls : u.photoUrls
-            return { ...u, photoUrls }
-          }),
-        )
-        if (!cancelled) {
-          setState((prev) => ({ ...prev, users: usersWithPhotos }))
-        }
+        setState((prev) => {
+          Promise.all(
+            prev.users.map(async (u) => {
+              const photos = await listUserPhotos(u.id)
+              const r2Urls = photos.map((p) => p.url)
+              return { ...u, photoUrls: r2Urls.length > 0 ? r2Urls : u.photoUrls }
+            }),
+          ).then((usersWithPhotos) => {
+            if (!cancelled) {
+              setState((current) => ({ ...current, users: usersWithPhotos }))
+            }
+          })
+          return prev
+        })
       } catch (err) {
         if (!cancelled) {
           setPersistWarning(
@@ -214,15 +228,12 @@ export function useAppState() {
     }
   }, [supabaseReady])
 
-  const setActiveUserId = useCallback((id: string) => {
-    setState((prev) => ({ ...prev, activeUserId: id }))
-  }, [])
-
   const updateUser = useCallback((id: string, patch: Partial<UserProfile>) => {
-    setState((prev) => ({
-      ...prev,
-      users: prev.users.map((u) => (u.id === id ? { ...u, ...patch } : u)),
-    }))
+    setState((prev) => {
+      const users = prev.users.map((u) => (u.id === id ? { ...u, ...patch } : u))
+      if (!isSupabaseEnabled()) saveLocalUsers(users)
+      return { ...prev, users }
+    })
 
     if (isSupabaseEnabled() && (patch.displayName !== undefined || patch.avatarUrl !== undefined)) {
       void updateProfileInDb(id, patch).catch((err) => {
@@ -231,7 +242,19 @@ export function useAppState() {
     }
   }, [])
 
-  const addPhoto = useCallback((userId: string, photoUrl: string) => {
+  const addPhoto = useCallback(async (userId: string, photoUrl: string) => {
+    if (!isValidPhotoUrl(photoUrl)) return
+
+    let photoId = `local-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`
+    if (isSupabaseEnabled()) {
+      try {
+        photoId = await insertPhotoInDb(userId, photoUrl)
+      } catch (err) {
+        setPersistWarning(`照片写入 Supabase 失败：${formatSupabaseError(err)}`)
+        throw err
+      }
+    }
+
     setState((prev) => {
       const user = prev.users.find((u) => u.id === userId)
       const notif: Notification = {
@@ -240,20 +263,41 @@ export function useAppState() {
         createdAt: Date.now(),
         read: false,
       }
+      const nextUsers = prev.users.map((u) =>
+        u.id === userId
+          ? appendPhoto(u, { id: photoId, url: photoUrl })
+          : u,
+      )
+      if (!isSupabaseEnabled()) {
+        saveLocalUsers(nextUsers)
+      }
       return {
         ...prev,
-        users: prev.users.map((u) =>
-          u.id === userId ? { ...u, photoUrls: [...u.photoUrls, photoUrl] } : u,
-        ),
+        users: nextUsers,
         notifications: [notif, ...prev.notifications].slice(0, 50),
       }
     })
+  }, [])
 
+  const removePhoto = useCallback(async (userId: string, photoId: string) => {
     if (isSupabaseEnabled()) {
-      void insertPhotoInDb(userId, photoUrl).catch((err) => {
-        setPersistWarning(`照片写入 Supabase 失败：${formatSupabaseError(err)}`)
-      })
+      try {
+        await deletePhotoInDb(photoId)
+      } catch (err) {
+        setPersistWarning(`删除照片失败：${formatSupabaseError(err)}`)
+        throw err
+      }
     }
+
+    setState((prev) => {
+      const nextUsers = prev.users.map((u) =>
+        u.id === userId ? removePhotoById(u, photoId) : u,
+      )
+      if (!isSupabaseEnabled()) {
+        saveLocalUsers(nextUsers)
+      }
+      return { ...prev, users: nextUsers }
+    })
   }, [])
 
   const sendMessage = useCallback((text: string, fromUserId: string) => {
@@ -282,8 +326,17 @@ export function useAppState() {
 
   const unreadCount = state.notifications.filter((n) => !n.read).length
 
-  const activeUser =
-    state.users.find((u) => u.id === state.activeUserId) ?? state.users[0]
+  const activeUser = withSyncedPhotos(
+    state.users.find((u) => u.id === loggedInUserId) ?? {
+      id: loggedInUserId,
+      displayName: '我',
+      avatarUrl: '',
+      photoUrls: [],
+      photos: [],
+      followerCount: 0,
+      role: 'member' as const,
+    },
+  )
 
   return {
     users: state.users,
@@ -291,16 +344,18 @@ export function useAppState() {
     notifications: state.notifications,
     unreadCount,
     activeUser,
-    activeUserId: state.activeUserId,
+    currentUserId: loggedInUserId,
     persistWarning,
     r2Ready,
     r2Enabled: isR2Enabled(),
     supabaseReady,
     supabaseEnabled: isSupabaseEnabled(),
-    setActiveUserId,
+    usersLoading,
     updateUser,
     addPhoto,
+    removePhoto,
     sendMessage,
     markNotificationsRead,
+    refetchUsers,
   }
 }
