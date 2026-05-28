@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { UserProfile } from '../types'
 import { normalizePhotoUrls } from '../utils/photos'
 import { UserPhotoCarousel } from './UserPhotoCarousel'
@@ -6,14 +7,17 @@ import './UserColumn.css'
 type Props = {
   user: UserProfile
   isMine: boolean
+  onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number, photoIds?: string[], isOwn?: boolean) => void
 }
 
 function getInitials(name: string) {
   return name.slice(0, 2) || '?'
 }
 
-export function UserColumn({ user, isMine }: Props) {
+export const UserColumn = memo(function UserColumn({ user, isMine, onViewPhoto }: Props) {
   const photos = normalizePhotoUrls(user.photoUrls)
+  const captions = user.photos.map((p) => p.caption)
+  const photoIds = user.photos.map((p) => p.id)
 
   return (
     <article
@@ -34,9 +38,9 @@ export function UserColumn({ user, isMine }: Props) {
         </div>
       </div>
 
-      <UserPhotoCarousel photos={photos} label={user.displayName} />
+      <UserPhotoCarousel photos={photos} captions={captions} photoIds={photoIds} label={user.displayName} isOwn={isMine} onViewPhoto={onViewPhoto} />
 
       <span className="user-column__count">{photos.length} 张</span>
     </article>
   )
-}
+})

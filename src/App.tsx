@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react'
 import { NavSidebar } from './components/nav/NavSidebar'
 import { UploadButton } from './components/UploadButton'
+import { UploadPreview } from './components/UploadPreview'
+import type { PreviewItem } from './components/UploadPreview'
+import { PhotoViewer } from './components/PhotoViewer'
 import { HomeFeed } from './views/HomeFeed'
 import { useAppState } from './hooks/useAppState'
 import { useAuth } from './hooks/useAuth'
@@ -9,7 +12,7 @@ import { uploadUserPhoto } from './lib/r2-api'
 import { isSupabaseEnabled } from './lib/supabase'
 import { uploadAvatarToSupabase, uploadPhotoToSupabase } from './lib/supabase-storage'
 import { formatSupabaseError } from './lib/supabase-errors'
-import { pickImageFile } from './utils/file'
+import { pickImageFiles } from './utils/file'
 import { compressImageFile, compressImageToBlob } from './utils/image'
 import { ExploreView } from './views/ExploreView'
 import { MessagesView } from './views/MessagesView'
@@ -90,8 +93,9 @@ function AuthenticatedApp({
     notifications,
     unreadCount,
     updateUser,
-    addPhoto,
+    addPost,
     removePhoto,
+    updatePhotoCaption,
     sendMessage,
     markNotificationsRead,
     persistWarning,
@@ -100,10 +104,20 @@ function AuthenticatedApp({
     usersLoading,
   } = useAppState(profileId)
 
+  const [previewItems, setPreviewItems] = useState<PreviewItem[] | null>(null)
+  const [viewerData, setViewerData] = useState<{
+    urls: string[]
+    captions: (string | undefined)[]
+    photoIds: string[]
+    index: number
+    isOwn: boolean
+  } | null>(null)
+
   const handleAvatarPick = useCallback(async () => {
+    const files = await pickImageFiles()
+    const file = files[0]
+    if (!file) return
     try {
-      const file = await pickImageFile()
-      if (!file) return
       if (r2Enabled && r2Ready) {
         const blob = await compressImageToBlob(file)
         const meta = await uploadUserPhoto(currentUserId, blob)
@@ -126,51 +140,79 @@ function AuthenticatedApp({
   }, [currentUserId, r2Enabled, r2Ready, updateUser])
 
   const handleUpload = useCallback(async () => {
-    try {
-      const file = await pickImageFile()
-      if (!file) return
+    const files = await pickImageFiles()
+    if (files.length === 0) return
 
-      if (r2Enabled) {
-        if (!r2Ready) {
-          window.alert('R2 API 未就绪，请先运行：npm run dev:api')
-          return
-        }
-        const blob = await compressImageToBlob(file)
-        const meta = await uploadUserPhoto(currentUserId, blob)
-        await addPhoto(currentUserId, meta.url)
-      } else if (isSupabaseEnabled()) {
-        const blob = await compressImageToBlob(file)
-        const url = await uploadPhotoToSupabase(currentUserId, blob)
-        await addPhoto(currentUserId, url)
-      } else {
-        const dataUrl = await compressImageFile(file)
-        await addPhoto(currentUserId, dataUrl)
-      }
+    const items = await Promise.all(
+      files.map((f) => compressImageFile(f)),
+    )
 
-      setActiveView('home')
-    } catch (err) {
-      window.alert(
-        isSupabaseEnabled() && !r2Enabled ? formatSupabaseError(err) : err instanceof Error
-          ? err.message
-          : '上传失败',
-      )
-    }
-  }, [currentUserId, addPhoto, r2Enabled, r2Ready, setActiveView])
+    setPreviewItems(items.map((dataUrl) => ({ dataUrl, caption: '' })))
+  }, [])
 
-  const handleDeletePhoto = useCallback(
-    async (photoId: string) => {
+  const handleUploadConfirm = useCallback(
+    async (title: string, items: PreviewItem[]) => {
+      setPreviewItems(null)
+
       try {
-        await removePhoto(currentUserId, photoId)
+        const uploaded: { url: string; caption?: string }[] = []
+        for (const item of items) {
+          if (r2Enabled) {
+            if (!r2Ready) {
+              window.alert('R2 API 未就绪，请先运行：npm run dev:api')
+              return
+            }
+            const blob = await (await fetch(item.dataUrl)).blob()
+            const meta = await uploadUserPhoto(currentUserId, blob)
+            uploaded.push({ url: meta.url, caption: item.caption })
+          } else if (isSupabaseEnabled()) {
+            const blob = await (await fetch(item.dataUrl)).blob()
+            const url = await uploadPhotoToSupabase(currentUserId, blob)
+            uploaded.push({ url, caption: item.caption })
+          } else {
+            uploaded.push({ url: item.dataUrl, caption: item.caption })
+          }
+        }
+
+        await addPost(currentUserId, uploaded, title)
+        setActiveView('home')
       } catch (err) {
         window.alert(
-          isSupabaseEnabled() ? formatSupabaseError(err) : err instanceof Error
+          isSupabaseEnabled() && !r2Enabled ? formatSupabaseError(err) : err instanceof Error
             ? err.message
-            : '删除失败',
+            : '上传失败',
         )
       }
     },
-    [currentUserId, removePhoto],
+    [currentUserId, addPost, r2Enabled, r2Ready, setActiveView],
   )
+
+  const handleUploadCancel = useCallback(() => {
+    setPreviewItems(null)
+  }, [])
+
+  const handleViewPhoto = useCallback(
+    (photos: string[], captions: (string | undefined)[], index: number, photoIds?: string[], isOwn?: boolean) => {
+      setViewerData({ urls: photos, captions, photoIds: photoIds ?? [], index, isOwn: isOwn ?? false })
+    },
+    [],
+  )
+
+  const handleOpenPost = useCallback((post: { photos: { id: string; url: string; caption?: string }[] }) => {
+    setViewerData({
+      urls: post.photos.map((p) => p.url),
+      captions: post.photos.map((p) => p.caption),
+      photoIds: post.photos.map((p) => p.id),
+      index: 0,
+      isOwn: true,
+    })
+  }, [])
+
+  const handleDeletePost = useCallback(async (post: { photos: { id: string }[] }) => {
+    for (const ph of post.photos) {
+      await removePhoto(currentUserId, ph.id)
+    }
+  }, [currentUserId, removePhoto])
 
   const pageTitle =
     activeView === 'profile' ? activeUser.displayName : VIEW_TITLES[activeView]
@@ -192,6 +234,7 @@ function AuthenticatedApp({
         activeUser={activeUser}
         unreadCount={unreadCount}
         onMarkNotificationsRead={markNotificationsRead}
+        onLogout={onLogout}
       />
 
       <main className={`app__main ${activeView === 'home' ? 'app__main--home' : ''}`}>
@@ -215,7 +258,7 @@ function AuthenticatedApp({
                 还没有其他用户，点击 + 上传你的第一张照片吧
               </p>
             ) : (
-              <HomeFeed users={users} currentUserId={currentUserId} />
+              <HomeFeed users={users} currentUserId={currentUserId} onViewPhoto={handleViewPhoto} />
             )
           )}
 
@@ -241,7 +284,11 @@ function AuthenticatedApp({
             <ProfileView
               user={activeUser}
               onAvatarPick={handleAvatarPick}
-              onDeletePhoto={handleDeletePhoto}
+              onOpenPost={handleOpenPost}
+              onDeletePost={handleDeletePost}
+              onOpenPhoto={(photo) => handleViewPhoto([photo.url], [photo.caption], 0, [photo.id], true)}
+              onDeletePhoto={(photoId) => removePhoto(currentUserId, photoId)}
+              onUpdateCaption={(photoId, caption) => updatePhotoCaption(currentUserId, photoId, caption)}
               onLogout={onLogout}
             />
           )}
@@ -249,6 +296,35 @@ function AuthenticatedApp({
       </main>
 
       <UploadButton onClick={handleUpload} />
+
+      {previewItems && (
+        <UploadPreview
+          items={previewItems}
+          onConfirm={handleUploadConfirm}
+          onCancel={handleUploadCancel}
+        />
+      )}
+
+      {viewerData && (
+        <PhotoViewer
+          urls={viewerData.urls}
+          captions={viewerData.captions}
+          photoIds={viewerData.photoIds}
+          startIndex={viewerData.index}
+          isOwn={viewerData.isOwn}
+          onClose={() => setViewerData(null)}
+          onUpdateCaption={
+            viewerData.isOwn
+              ? (photoId, caption) => updatePhotoCaption(currentUserId, photoId, caption)
+              : undefined
+          }
+          onDeletePhoto={
+            viewerData.isOwn
+              ? (photoId) => removePhoto(currentUserId, photoId)
+              : undefined
+          }
+        />
+      )}
 
       {persistWarning && (
         <p className="app__persist-warning" role="status">

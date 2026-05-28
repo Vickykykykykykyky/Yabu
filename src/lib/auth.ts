@@ -62,6 +62,7 @@ export async function registerWithName(name: string): Promise<AuthSession> {
     avatarUrl: '',
     photoUrls: [],
     photos: [],
+    posts: [],
     followerCount: 0,
     role: 'member',
   }

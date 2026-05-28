@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import './UserPhotoCarousel.css'
 
-const MAX_REAL_WHEN_MANY = 3
-const MAX_SHADOW_LAYERS = 4
+const MAX_VISIBLE = 5
 
 type FanConfig = {
   frontRot: number
@@ -11,18 +10,15 @@ type FanConfig = {
   tyStep: number
 }
 
-const FAN_NORMAL: FanConfig = {
-  frontRot: 8,
-  rotStep: -9,
-  txStep: -6,
-  tyStep: -5,
-}
-
-const FAN_COMPACT: FanConfig = {
-  frontRot: 6,
-  rotStep: -5,
-  txStep: -3.5,
-  tyStep: -2.5,
+function getFanConfig(count: number): FanConfig {
+  if (count <= 1) return { frontRot: 0, rotStep: 0, txStep: 0, tyStep: 0 }
+  const scale = 3 / count
+  return {
+    frontRot: 8,
+    rotStep: -9 * scale,
+    txStep: -6 * scale,
+    tyStep: -5 * scale,
+  }
 }
 
 function getFanTransform(depth: number, config: FanConfig): string {
@@ -34,10 +30,26 @@ function getFanTransform(depth: number, config: FanConfig): string {
 
 type Props = {
   photos: string[]
+  captions?: (string | undefined)[]
+  photoIds?: string[]
   label: string
+  isOwn?: boolean
+  onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number, photoIds?: string[], isOwn?: boolean) => void
 }
 
-export function UserPhotoCarousel({ photos, label }: Props) {
+function arePhotoPropsEqual(
+  a: Props,
+  b: Props,
+) {
+  if (a.label !== b.label) return false
+  if (a.photos.length !== b.photos.length) return false
+  if (a.photos.some((url, i) => url !== b.photos[i])) return false
+  if (a.captions?.length !== b.captions?.length) return false
+  if (a.captions?.some((c, i) => c !== b.captions?.[i])) return false
+  return true
+}
+
+export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, captions, photoIds, label, isOwn, onViewPhoto }: Props) {
   const [index, setIndex] = useState(0)
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
 
@@ -46,12 +58,11 @@ export function UserPhotoCarousel({ photos, label }: Props) {
     [photos, hidden],
   )
 
-  const compact = visible.length > MAX_REAL_WHEN_MANY
-  const fan = compact ? FAN_COMPACT : FAN_NORMAL
-  const maxRealCards = compact ? MAX_REAL_WHEN_MANY : visible.length
-  const shadowCount = compact
-    ? Math.min(visible.length - MAX_REAL_WHEN_MANY, MAX_SHADOW_LAYERS)
-    : 0
+  const currentCaption = captions?.[photos.length - 1 - index]
+
+  const cardCount = Math.min(visible.length, MAX_VISIBLE)
+  const fan = getFanConfig(cardCount)
+  const hiddenCount = visible.length > MAX_VISIBLE ? visible.length - MAX_VISIBLE : 0
 
   useEffect(() => {
     setIndex(0)
@@ -92,7 +103,7 @@ export function UserPhotoCarousel({ photos, label }: Props) {
       i,
       depth: (i - index + visible.length) % visible.length,
     }))
-    .filter(({ depth }) => depth < maxRealCards)
+    .filter(({ depth }) => depth < cardCount)
     .sort((a, b) => b.depth - a.depth)
 
   return (
@@ -102,9 +113,7 @@ export function UserPhotoCarousel({ photos, label }: Props) {
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <div
-        className={`photo-stack__deck ${compact ? 'photo-stack__deck--compact' : ''}`}
-      >
+      <div className="photo-stack__deck">
         {stackItems.map(({ url, i, depth }) => {
           const isTop = depth === 0
           return (
@@ -113,12 +122,15 @@ export function UserPhotoCarousel({ photos, label }: Props) {
               type="button"
               className={`photo-stack__card ${isTop ? 'photo-stack__card--top' : 'photo-stack__card--behind'}`}
               style={{
-                zIndex: maxRealCards + shadowCount - depth,
+                zIndex: cardCount - depth,
                 transform: getFanTransform(depth, fan),
               }}
               aria-label={isTop ? `当前第 ${index + 1} 张` : `查看第 ${i + 1} 张`}
               onClick={() => {
-                if (!isTop) setIndex(i)
+                if (isTop) {
+                  const originalIndex = photos.indexOf(visible[index])
+                  onViewPhoto?.(photos, captions ?? [], originalIndex >= 0 ? originalIndex : 0, photoIds, isOwn)
+                } else setIndex(i)
               }}
             >
               <img
@@ -132,23 +144,11 @@ export function UserPhotoCarousel({ photos, label }: Props) {
           )
         })}
 
-        {shadowCount > 0
-          ? Array.from({ length: shadowCount }, (_, i) => {
-              const depth = maxRealCards + i
-              return (
-                <div
-                  key={`shadow-${i}`}
-                  className="photo-stack__shadow"
-                  style={{
-                    zIndex: shadowCount - i,
-                    transform: getFanTransform(depth, fan),
-                    opacity: 0.55 - i * 0.1,
-                  }}
-                  aria-hidden
-                />
-              )
-            })
-          : null}
+        {hiddenCount > 0 && (
+          <div className="photo-stack__overflow" aria-hidden>
+            +{hiddenCount}
+          </div>
+        )}
 
         {hasMultiple ? (
           <>
@@ -172,6 +172,10 @@ export function UserPhotoCarousel({ photos, label }: Props) {
         ) : null}
       </div>
 
+      {currentCaption && (
+        <p className="photo-stack__caption">{currentCaption}</p>
+      )}
+
       {hasMultiple ? (
         <div className="photo-stack__footer">
           <div className="photo-stack__footer-row">
@@ -194,6 +198,7 @@ export function UserPhotoCarousel({ photos, label }: Props) {
           </div>
         </div>
       ) : null}
+
     </div>
   )
-}
+}, arePhotoPropsEqual)

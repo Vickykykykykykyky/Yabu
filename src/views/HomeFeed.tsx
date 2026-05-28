@@ -7,6 +7,7 @@ const USERS_PER_ROW = 3
 type Props = {
   users: UserProfile[]
   currentUserId: string
+  onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number) => void
 }
 
 function chunkUsers(users: UserProfile[]): UserProfile[][] {
@@ -18,7 +19,7 @@ function chunkUsers(users: UserProfile[]): UserProfile[][] {
   return rows
 }
 
-export function HomeFeed({ users, currentUserId }: Props) {
+export function HomeFeed({ users, currentUserId, onViewPhoto }: Props) {
   const rows = chunkUsers(users)
 
   return (
@@ -34,6 +35,7 @@ export function HomeFeed({ users, currentUserId }: Props) {
               key={user.id}
               user={user}
               isMine={user.id === currentUserId}
+              onViewPhoto={onViewPhoto}
             />
           ))}
         </section>

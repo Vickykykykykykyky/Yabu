@@ -138,7 +138,6 @@
   align-items: center;
   gap: 0.85rem;
   padding: 0.65rem 0.75rem;
-  margin-bottom: 0.25rem;
   border: none;
   background: none;
   cursor: pointer;
@@ -196,6 +195,17 @@
 .nav-sidebar--pinned .nav-sidebar__user-name {
   opacity: 1;
   max-width: 120px;
+}
+
+.nav-sidebar__logout {
+  border-top: 1px solid #efefef;
+  margin-top: 0.25rem;
+  color: #8e8e8e;
+  font-size: 0.9rem;
+}
+
+.nav-sidebar__logout:hover {
+  color: #e94560;
 }
 
 @media (hover: none) {

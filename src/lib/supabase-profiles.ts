@@ -1,5 +1,5 @@
 import { getSupabase } from './supabase'
-import type { UserPhoto, UserProfile, UserRole } from '../types'
+import type { Post, UserPhoto, UserProfile, UserRole } from '../types'
 
 type ProfileRow = {
   id: string
@@ -12,15 +12,59 @@ type PhotoRow = {
   id: string
   profile_id: string
   url: string
+  caption?: string | null
+  original_url?: string | null
+  thumbnail_url?: string | null
+  width?: number | null
+  height?: number | null
+  post_id?: string | null
+}
+
+type PostRow = {
+  id: string
+  profile_id: string
+  title?: string | null
+  created_at: string
 }
 
 function rowsToPhotos(rows: PhotoRow[]): UserPhoto[] {
-  return rows.map((r) => ({ id: r.id, url: r.url }))
+  return rows.map((r) => {
+    const photo: UserPhoto = { id: r.id, url: r.url }
+    if (r.caption) photo.caption = r.caption
+    if (r.original_url) photo.originalUrl = r.original_url
+    if (r.thumbnail_url) photo.thumbnailUrl = r.thumbnail_url
+    if (r.width != null) photo.width = r.width
+    if (r.height != null) photo.height = r.height
+    if (r.post_id) photo.postId = r.post_id
+    return photo
+  })
 }
 
-function rowToProfile(p: ProfileRow, photoRows: PhotoRow[] = []): UserProfile {
+function rowsToPosts(postRows: PostRow[], allPhotos: UserPhoto[]): Post[] {
+  const photosByPost = new Map<string, UserPhoto[]>()
+  const standalone: UserPhoto[] = []
+  for (const ph of allPhotos) {
+    if (ph.postId) {
+      const list = photosByPost.get(ph.postId) ?? []
+      list.push(ph)
+      photosByPost.set(ph.postId, list)
+    } else {
+      standalone.push(ph)
+    }
+  }
+  return postRows.map((r) => ({
+    id: r.id,
+    profileId: r.profile_id,
+    title: r.title ?? undefined,
+    photos: photosByPost.get(r.id) ?? [],
+    createdAt: new Date(r.created_at).getTime(),
+  }))
+}
+
+function rowToProfile(p: ProfileRow, photoRows: PhotoRow[] = [], postRows: PostRow[] = []): UserProfile {
   const photos = rowsToPhotos(photoRows)
   const photoUrls = photos.map((ph) => ph.url)
+  const posts = rowsToPosts(postRows, photos)
   return {
     id: p.id,
     displayName: p.display_name,
@@ -28,6 +72,7 @@ function rowToProfile(p: ProfileRow, photoRows: PhotoRow[] = []): UserProfile {
     role: p.role,
     photos,
     photoUrls,
+    posts,
     followerCount: 0,
   }
 }
@@ -62,7 +107,7 @@ export async function fetchProfileById(id: string): Promise<UserProfile | null> 
 
   const { data: photos, error: photoError } = await supabase
     .from('photos')
-    .select('id, profile_id, url')
+    .select('id, profile_id, url, caption, original_url, thumbnail_url, width, height, post_id')
     .eq('profile_id', id)
     .order('created_at')
 
@@ -141,9 +186,21 @@ export async function fetchAllProfiles(): Promise<UserProfile[]> {
 
   if (profileError) throw profileError
 
+  let posts: PostRow[] = []
+  try {
+    const { data: postData, error: postError } = await supabase
+      .from('posts')
+      .select('id, profile_id, title, created_at')
+      .order('created_at', { ascending: false })
+    if (postError) throw postError
+    posts = (postData ?? []) as PostRow[]
+  } catch {
+    posts = []
+  }
+
   const { data: photos, error: photoError } = await supabase
     .from('photos')
-    .select('id, profile_id, url')
+    .select('id, profile_id, url, caption, original_url, thumbnail_url, width, height, post_id')
     .order('created_at')
 
   if (photoError) throw photoError
@@ -155,8 +212,15 @@ export async function fetchAllProfiles(): Promise<UserProfile[]> {
     photosByProfile.set(row.profile_id, list)
   }
 
+  const postsByProfile = new Map<string, PostRow[]>()
+  for (const row of posts) {
+    const list = postsByProfile.get(row.profile_id) ?? []
+    list.push(row)
+    postsByProfile.set(row.profile_id, list)
+  }
+
   return ((profiles ?? []) as ProfileRow[]).map((p) =>
-    rowToProfile(p, photosByProfile.get(p.id) ?? []),
+    rowToProfile(p, photosByProfile.get(p.id) ?? [], postsByProfile.get(p.id) ?? []),
   )
 }
 
@@ -176,19 +240,44 @@ export async function updateProfileInDb(
 export async function insertPhotoInDb(
   profileId: string,
   url: string,
+  caption?: string,
+  extra?: {
+    originalUrl?: string
+    thumbnailUrl?: string
+    width?: number
+    height?: number
+    postId?: string
+  },
 ): Promise<string> {
   const supabase = getSupabase()
+  const record: Record<string, string | number> = { profile_id: profileId, url }
+  if (caption) record.caption = caption
+  if (extra?.originalUrl) record.original_url = extra.originalUrl
+  if (extra?.thumbnailUrl) record.thumbnail_url = extra.thumbnailUrl
+  if (extra?.width != null) record.width = extra.width
+  if (extra?.height != null) record.height = extra.height
+  if (extra?.postId) record.post_id = extra.postId
   const { data, error } = await supabase
     .from('photos')
-    .insert({
-      profile_id: profileId,
-      url,
-    })
+    .insert(record)
     .select('id')
     .single()
 
   if (error) throw error
   return (data as { id: string }).id
+}
+
+export async function updatePhotoCaptionInDb(
+  photoId: string,
+  caption: string,
+): Promise<void> {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from('photos')
+    .update({ caption })
+    .eq('id', photoId)
+
+  if (error) throw error
 }
 
 export async function deletePhotoInDb(photoId: string) {
@@ -207,4 +296,22 @@ export async function deletePhotoInDb(photoId: string) {
     err.code = 'PHOTO_DELETE_DENIED'
     throw err
   }
+}
+
+export async function insertPostInDb(
+  profileId: string,
+  title?: string,
+): Promise<string> {
+  const supabase = getSupabase()
+  const record: Record<string, string> = { profile_id: profileId }
+  if (title && title.trim()) record.title = title.trim()
+
+  const { data, error } = await supabase
+    .from('posts')
+    .insert(record)
+    .select('id')
+    .single()
+
+  if (error) throw error
+  return (data as { id: string }).id
 }

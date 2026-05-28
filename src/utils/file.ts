@@ -29,12 +29,46 @@ export function pickImageFile(): Promise<File | null> {
     document.body.appendChild(input)
     input.click()
 
-    // 用户取消选择时 change 可能不触发
     window.addEventListener(
       'focus',
       () => {
         window.setTimeout(() => {
           if (!settled) finish(null)
+        }, 500)
+      },
+      { once: true },
+    )
+  })
+}
+
+export function pickImageFiles(): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+    input.style.display = 'none'
+
+    let settled = false
+    const finish = (files: File[]) => {
+      if (settled) return
+      settled = true
+      input.remove()
+      resolve(files)
+    }
+
+    input.addEventListener('change', () => {
+      finish(Array.from(input.files ?? []))
+    })
+
+    document.body.appendChild(input)
+    input.click()
+
+    window.addEventListener(
+      'focus',
+      () => {
+        window.setTimeout(() => {
+          if (!settled) finish([])
         }, 500)
       },
       { once: true },

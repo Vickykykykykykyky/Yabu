@@ -5,6 +5,8 @@ import {
   deletePhotoInDb,
   fetchAllProfiles,
   insertPhotoInDb,
+  insertPostInDb,
+  updatePhotoCaptionInDb,
   updateProfileInDb,
 } from '../lib/supabase-profiles'
 import { isSupabaseEnabled } from '../lib/supabase'
@@ -242,13 +244,13 @@ export function useAppState(loggedInUserId: string) {
     }
   }, [])
 
-  const addPhoto = useCallback(async (userId: string, photoUrl: string) => {
+  const addPhoto = useCallback(async (userId: string, photoUrl: string, caption?: string) => {
     if (!isValidPhotoUrl(photoUrl)) return
 
     let photoId = `local-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`
     if (isSupabaseEnabled()) {
       try {
-        photoId = await insertPhotoInDb(userId, photoUrl)
+        photoId = await insertPhotoInDb(userId, photoUrl, caption)
       } catch (err) {
         setPersistWarning(`照片写入 Supabase 失败：${formatSupabaseError(err)}`)
         throw err
@@ -265,12 +267,76 @@ export function useAppState(loggedInUserId: string) {
       }
       const nextUsers = prev.users.map((u) =>
         u.id === userId
-          ? appendPhoto(u, { id: photoId, url: photoUrl })
+          ? appendPhoto(u, { id: photoId, url: photoUrl, caption })
           : u,
       )
       if (!isSupabaseEnabled()) {
         saveLocalUsers(nextUsers)
       }
+      return {
+        ...prev,
+        users: nextUsers,
+        notifications: [notif, ...prev.notifications].slice(0, 50),
+      }
+    })
+  }, [])
+
+  const addPost = useCallback(async (
+    userId: string,
+    items: { url: string; caption?: string }[],
+    title?: string,
+  ) => {
+    const normalized = items.filter((it) => isValidPhotoUrl(it.url))
+    if (normalized.length === 0) return
+
+    let postId = `local-post-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`
+    if (isSupabaseEnabled()) {
+      try {
+        postId = await insertPostInDb(userId, title)
+        for (const it of normalized) {
+          await insertPhotoInDb(userId, it.url, it.caption, { postId })
+        }
+      } catch (err) {
+        setPersistWarning(`作品写入 Supabase 失败：${formatSupabaseError(err)}`)
+        throw err
+      }
+    }
+
+    setState((prev) => {
+      const user = prev.users.find((u) => u.id === userId)
+      const notif: Notification = {
+        id: `notif-${Date.now()}`,
+        text: `${user?.displayName ?? '你'} 上传了一组新作品`,
+        createdAt: Date.now(),
+        read: false,
+      }
+
+      const nextUsers = prev.users.map((u) => {
+        if (u.id !== userId) return u
+        const newPhotos = normalized.map((it) => ({
+          id: `local-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`,
+          url: it.url,
+          caption: it.caption,
+          postId,
+        }))
+        const photos = [...u.photos, ...newPhotos]
+        const posts = [
+          {
+            id: postId,
+            profileId: userId,
+            title: title?.trim() || undefined,
+            photos: newPhotos,
+            createdAt: Date.now(),
+          },
+          ...(u.posts ?? []),
+        ]
+        return { ...u, photos, posts }
+      })
+
+      if (!isSupabaseEnabled()) {
+        saveLocalUsers(nextUsers)
+      }
+
       return {
         ...prev,
         users: nextUsers,
@@ -298,6 +364,33 @@ export function useAppState(loggedInUserId: string) {
       }
       return { ...prev, users: nextUsers }
     })
+  }, [])
+
+  const updatePhotoCaption = useCallback(async (userId: string, photoId: string, caption: string) => {
+    setState((prev) => {
+      const nextUsers = prev.users.map((u) =>
+        u.id === userId
+          ? {
+              ...u,
+              photos: u.photos.map((p) =>
+                p.id === photoId ? { ...p, caption } : p,
+              ),
+            }
+          : u,
+      )
+      if (!isSupabaseEnabled()) {
+        saveLocalUsers(nextUsers)
+      }
+      return { ...prev, users: nextUsers }
+    })
+
+    if (isSupabaseEnabled()) {
+      try {
+        await updatePhotoCaptionInDb(photoId, caption)
+      } catch (err) {
+        setPersistWarning(`同步到数据库失败：${formatSupabaseError(err)}`)
+      }
+    }
   }, [])
 
   const sendMessage = useCallback((text: string, fromUserId: string) => {
@@ -333,6 +426,7 @@ export function useAppState(loggedInUserId: string) {
       avatarUrl: '',
       photoUrls: [],
       photos: [],
+      posts: [],
       followerCount: 0,
       role: 'member' as const,
     },
@@ -353,7 +447,9 @@ export function useAppState(loggedInUserId: string) {
     usersLoading,
     updateUser,
     addPhoto,
+    addPost,
     removePhoto,
+    updatePhotoCaption,
     sendMessage,
     markNotificationsRead,
     refetchUsers,

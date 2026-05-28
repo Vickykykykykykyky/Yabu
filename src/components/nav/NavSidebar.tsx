@@ -6,6 +6,7 @@ import {
   IconHeart,
   IconHome,
   IconLogo,
+  IconLogout,
   IconMessages,
   IconReels,
   IconSearch,
@@ -19,6 +20,7 @@ type Props = {
   activeUser: UserProfile
   unreadCount: number
   onMarkNotificationsRead: () => void
+  onLogout: () => void
 }
 
 const NAV_ITEMS: { id: NavView; label: string; Icon: typeof IconHome }[] = [
@@ -41,6 +43,7 @@ export function NavSidebar({
   activeUser,
   unreadCount,
   onMarkNotificationsRead,
+  onLogout,
 }: Props) {
   const [hovered, setHovered] = useState(false)
   const [pinned, setPinned] = useState(false)
@@ -128,6 +131,19 @@ export function NavSidebar({
           )}
         </span>
         <span className="nav-sidebar__user-name">{activeUser.displayName}</span>
+      </button>
+
+      <button
+        type="button"
+        className="nav-sidebar__item nav-sidebar__logout"
+        onClick={onLogout}
+        title={!expanded ? '退出登录' : undefined}
+        aria-label="退出登录"
+      >
+        <span className="nav-sidebar__icon-wrap">
+          <IconLogout className="nav-sidebar__icon" />
+        </span>
+        <span className="nav-sidebar__label">退出登录</span>
       </button>
     </aside>
   )

@@ -19,7 +19,6 @@
   background: #ffffff;
 }
 
-/* 底部多留空：扇形以底边为轴旋转，角会探出容器 */
 .photo-stack__deck {
   --stack-inset-x: 1.75rem;
   --stack-inset-y: 0.75rem;
@@ -29,11 +28,6 @@
   min-height: 0;
   padding: 0.5rem var(--stack-inset-x) var(--stack-fan-bottom);
   overflow: visible;
-}
-
-.photo-stack__deck--compact {
-  --stack-inset-x: 1.35rem;
-  --stack-fan-bottom: 2.5rem;
 }
 
 .photo-stack__card {
@@ -83,33 +77,22 @@
     0 0 0 2px rgba(233, 69, 96, 0.3);
 }
 
-/* 超出 3 张时，后排用阴影卡片暗示还有更多 */
-.photo-stack__shadow {
+.photo-stack__overflow {
   position: absolute;
   bottom: var(--stack-fan-bottom);
   left: 50%;
-  height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.85rem);
-  max-height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.85rem);
-  width: auto;
-  max-width: calc(100% - var(--stack-inset-x) * 2 - 0.5rem);
-  aspect-ratio: 5 / 7;
-  border-radius: 10px;
-  transform-origin: 50% 100%;
+  transform: translate(-50%, 0);
+  z-index: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
   pointer-events: none;
-  background: linear-gradient(160deg, #e5e7eb 0%, #c4c9d4 55%, #b8bec8 100%);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.05),
-    0 6px 16px rgba(0, 0, 0, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  transition:
-    transform 0.35s cubic-bezier(0.25, 0.9, 0.35, 1),
-    opacity 0.25s ease;
-}
-
-.photo-stack__deck--compact .photo-stack__card {
-  height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.35rem);
-  max-height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.35rem);
 }
 
 .photo-stack__nav {
@@ -185,4 +168,16 @@
   color: #6b7280;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+}
+
+.photo-stack__caption {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #525252;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
