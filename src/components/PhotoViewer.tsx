@@ -34,12 +34,13 @@ type Props = {
   photoIds?: string[]
   startIndex: number
   isOwn?: boolean
+  postTitle?: string
   onClose: () => void
   onUpdateCaption?: (photoId: string, caption: string) => void
   onDeletePhoto?: (photoId: string) => void
 }
 
-export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, onClose, onUpdateCaption, onDeletePhoto }: Props) {
+export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, postTitle, onClose, onUpdateCaption, onDeletePhoto }: Props) {
   const [index, setIndex] = useState(startIndex)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
@@ -181,6 +182,7 @@ export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, onClo
       </div>
 
       <div className="photo-viewer__meta">
+        {postTitle && <div className="photo-viewer__post-title">{postTitle}</div>}
         {editing ? (
           <div className="photo-viewer__edit-row">
             <input

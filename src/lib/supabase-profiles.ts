@@ -271,6 +271,8 @@ export async function updatePhotoCaptionInDb(
   photoId: string,
   caption: string,
 ): Promise<void> {
+  if (!UUID_RE.test(photoId)) return
+
   const supabase = getSupabase()
   const { error } = await supabase
     .from('photos')
@@ -280,7 +282,11 @@ export async function updatePhotoCaptionInDb(
   if (error) throw error
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function deletePhotoInDb(photoId: string) {
+  if (!UUID_RE.test(photoId)) return
+
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('photos')

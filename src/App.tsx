@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavSidebar } from './components/nav/NavSidebar'
 import { UploadButton } from './components/UploadButton'
 import { UploadPreview } from './components/UploadPreview'
@@ -35,7 +35,27 @@ const VIEW_TITLES: Record<NavView, string> = {
 
 export default function App() {
   const auth = useAuth()
-  const [activeView, setActiveView] = useState<NavView>('home')
+  const [activeView, setActiveView] = useState<NavView>(() => {
+    const hash = window.location.hash.replace('#', '')
+    const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile']
+    return valid.includes(hash as NavView) ? (hash as NavView) : 'home'
+  })
+
+  useEffect(() => {
+    window.location.hash = activeView
+  }, [activeView])
+
+  useEffect(() => {
+    const onPop = () => {
+      const hash = window.location.hash.replace('#', '')
+      const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile']
+      if (valid.includes(hash as NavView)) {
+        setActiveView(hash as NavView)
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   if (auth.booting) {
     return (
@@ -102,15 +122,27 @@ function AuthenticatedApp({
     r2Enabled,
     r2Ready,
     usersLoading,
+    refetchUsers,
   } = useAppState(profileId)
 
+  const shuffledUsers = useMemo(() => {
+    const arr = [...users]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr
+  }, [users])
+
   const [previewItems, setPreviewItems] = useState<PreviewItem[] | null>(null)
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   const [viewerData, setViewerData] = useState<{
     urls: string[]
     captions: (string | undefined)[]
     photoIds: string[]
     index: number
     isOwn: boolean
+    postTitle?: string
   } | null>(null)
 
   const handleAvatarPick = useCallback(async () => {
@@ -175,7 +207,7 @@ function AuthenticatedApp({
         }
 
         await addPost(currentUserId, uploaded, title)
-        setActiveView('home')
+        refetchUsers()
       } catch (err) {
         window.alert(
           isSupabaseEnabled() && !r2Enabled ? formatSupabaseError(err) : err instanceof Error
@@ -184,7 +216,7 @@ function AuthenticatedApp({
         )
       }
     },
-    [currentUserId, addPost, r2Enabled, r2Ready, setActiveView],
+    [currentUserId, addPost, r2Enabled, r2Ready, refetchUsers],
   )
 
   const handleUploadCancel = useCallback(() => {
@@ -198,13 +230,14 @@ function AuthenticatedApp({
     [],
   )
 
-  const handleOpenPost = useCallback((post: { photos: { id: string; url: string; caption?: string }[] }) => {
+  const handleOpenPost = useCallback((post: { photos: { id: string; url: string; caption?: string }[]; title?: string }) => {
     setViewerData({
       urls: post.photos.map((p) => p.url),
       captions: post.photos.map((p) => p.caption),
       photoIds: post.photos.map((p) => p.id),
       index: 0,
       isOwn: true,
+      postTitle: post.title,
     })
   }, [])
 
@@ -214,13 +247,18 @@ function AuthenticatedApp({
     }
   }, [currentUserId, removePhoto])
 
+  const handleNavigate = useCallback((view: NavView) => {
+    if (view === 'profile') setViewingUserId(null)
+    setActiveView(view)
+  }, [setActiveView])
+
   const pageTitle =
     activeView === 'profile' ? activeUser.displayName : VIEW_TITLES[activeView]
 
   const selectUser = useCallback(
     (id: string) => {
-      if (id === currentUserId) setActiveView('profile')
-      else setActiveView('home')
+      setViewingUserId(id === currentUserId ? null : id)
+      setActiveView('profile')
     },
     [currentUserId, setActiveView],
   )
@@ -229,7 +267,7 @@ function AuthenticatedApp({
     <div className="app">
       <NavSidebar
         activeView={activeView}
-        onNavigate={setActiveView}
+        onNavigate={handleNavigate}
         onCreate={handleUpload}
         activeUser={activeUser}
         unreadCount={unreadCount}
@@ -258,7 +296,7 @@ function AuthenticatedApp({
                 还没有其他用户，点击 + 上传你的第一张照片吧
               </p>
             ) : (
-              <HomeFeed users={users} currentUserId={currentUserId} onViewPhoto={handleViewPhoto} />
+              <HomeFeed users={shuffledUsers} currentUserId={currentUserId} onViewPhoto={handleViewPhoto} onSelectUser={selectUser} />
             )
           )}
 
@@ -280,18 +318,25 @@ function AuthenticatedApp({
           {activeView === 'notifications' && (
             <NotificationsView notifications={notifications} />
           )}
-          {activeView === 'profile' && (
-            <ProfileView
-              user={activeUser}
-              onAvatarPick={handleAvatarPick}
-              onOpenPost={handleOpenPost}
-              onDeletePost={handleDeletePost}
-              onOpenPhoto={(photo) => handleViewPhoto([photo.url], [photo.caption], 0, [photo.id], true)}
-              onDeletePhoto={(photoId) => removePhoto(currentUserId, photoId)}
-              onUpdateCaption={(photoId, caption) => updatePhotoCaption(currentUserId, photoId, caption)}
-              onLogout={onLogout}
-            />
-          )}
+          {activeView === 'profile' && (() => {
+            const isOwn = !viewingUserId || viewingUserId === currentUserId
+            const profileUser = isOwn ? activeUser : (users.find(u => u.id === viewingUserId) ?? activeUser)
+            return (
+              <ProfileView
+                user={profileUser}
+                onAvatarPick={isOwn ? handleAvatarPick : undefined}
+                onOpenPost={isOwn ? handleOpenPost : (p) => handleViewPhoto(p.photos.map(ph => ph.url), p.photos.map(ph => ph.caption), 0, p.photos.map(ph => ph.id), false)}
+                onDeletePost={isOwn ? handleDeletePost : undefined}
+                onOpenPhoto={isOwn
+                  ? (photo) => handleViewPhoto([photo.url], [photo.caption], 0, [photo.id], true)
+                  : (photo) => handleViewPhoto([photo.url], [photo.caption], 0, [photo.id], false)}
+                onDeletePhoto={isOwn ? ((photoId: string) => removePhoto(currentUserId, photoId)) : undefined}
+                onUpdateCaption={isOwn ? ((photoId: string, caption: string) => updatePhotoCaption(currentUserId, photoId, caption)) : undefined}
+                onUpdateName={isOwn ? ((id: string, name: string) => updateUser(id, { displayName: name })) : undefined}
+                onLogout={isOwn ? onLogout : undefined}
+              />
+            )
+          })()}
         </div>
       </main>
 
@@ -312,6 +357,7 @@ function AuthenticatedApp({
           photoIds={viewerData.photoIds}
           startIndex={viewerData.index}
           isOwn={viewerData.isOwn}
+          postTitle={viewerData.postTitle}
           onClose={() => setViewerData(null)}
           onUpdateCaption={
             viewerData.isOwn
