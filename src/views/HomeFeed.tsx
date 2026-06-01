@@ -7,6 +7,8 @@ type Props = {
   currentUserId: string
   onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number) => void
   onSelectUser?: (id: string) => void
+  onToggleLike?: (postId: string) => Promise<boolean | null>
+  onToggleFavorite?: (postId: string) => Promise<boolean | null>
 }
 
 function chunkUsers(users: UserProfile[]): UserProfile[][] {
@@ -17,29 +19,21 @@ function chunkUsers(users: UserProfile[]): UserProfile[][] {
     (u) => !u.posts?.some((p) => p.photos.length >= 3),
   )
 
-  const shuffled = [...others]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-
   const rows: UserProfile[][] = []
   let mIdx = 0
   let oIdx = 0
   let lastWasSingle = false
 
   const nextSize = () => {
-    const remaining = shuffled.length - oIdx
+    const remaining = others.length - oIdx
     const min = lastWasSingle && remaining >= 2 ? 2 : 1
-    const max = Math.min(3, remaining)
-    if (min > max) return max
-    return min + Math.floor(Math.random() * (max - min + 1))
+    return Math.min(3, remaining)
   }
 
-  while (oIdx < shuffled.length || mIdx < multi.length) {
-    if (oIdx < shuffled.length) {
+  while (oIdx < others.length || mIdx < multi.length) {
+    if (oIdx < others.length) {
       const size = nextSize()
-      rows.push(shuffled.slice(oIdx, oIdx + size))
+      rows.push(others.slice(oIdx, oIdx + size))
       oIdx += size
       lastWasSingle = size === 1
     }
@@ -47,7 +41,7 @@ function chunkUsers(users: UserProfile[]): UserProfile[][] {
     if (mIdx < multi.length && !lastWasSingle) {
       rows.push([multi[mIdx++]])
       lastWasSingle = true
-    } else if (mIdx < multi.length && oIdx >= shuffled.length) {
+    } else if (mIdx < multi.length && oIdx >= others.length) {
       rows.push([multi[mIdx++]])
     }
   }
@@ -55,7 +49,7 @@ function chunkUsers(users: UserProfile[]): UserProfile[][] {
   return rows
 }
 
-export function HomeFeed({ users, currentUserId, onViewPhoto, onSelectUser }: Props) {
+export function HomeFeed({ users, currentUserId, onViewPhoto, onSelectUser, onToggleLike, onToggleFavorite }: Props) {
   const rows = chunkUsers(users)
 
   return (
@@ -74,6 +68,8 @@ export function HomeFeed({ users, currentUserId, onViewPhoto, onSelectUser }: Pr
               isFullWidth={rowUsers.length === 1}
               onViewPhoto={onViewPhoto}
               onSelectUser={onSelectUser}
+              onToggleLike={onToggleLike}
+              onToggleFavorite={onToggleFavorite}
             />
           ))}
         </section>

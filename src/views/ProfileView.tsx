@@ -1,6 +1,26 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useReducer, useState } from 'react'
 import type { Post, UserPhoto, UserProfile } from '../types'
 import './MediaViews.css'
+
+type EditState = { photoId: string | null; value: string }
+
+type EditAction =
+  | { type: 'start'; photoId: string; value: string }
+  | { type: 'typing'; value: string }
+  | { type: 'cancel' }
+  | { type: 'save' }
+
+function editReducer(_state: EditState, action: EditAction): EditState {
+  switch (action.type) {
+    case 'start':
+      return { photoId: action.photoId, value: action.value }
+    case 'typing':
+      return { photoId: _state.photoId, value: action.value }
+    case 'cancel':
+    case 'save':
+      return { photoId: null, value: '' }
+  }
+}
 
 type Props = {
   user: UserProfile
@@ -11,6 +31,8 @@ type Props = {
   onDeletePhoto?: (photoId: string) => void
   onUpdateCaption?: (photoId: string, caption: string) => void
   onUpdateName?: (id: string, name: string) => void
+  onToggleLike?: (postId: string) => Promise<boolean | null>
+  onToggleFavorite?: (postId: string) => Promise<boolean | null>
   onLogout?: () => void
 }
 
@@ -27,11 +49,15 @@ export function ProfileView({
   onDeletePhoto,
   onUpdateCaption,
   onUpdateName,
+  onToggleLike,
+  onToggleFavorite,
   onLogout,
 }: Props) {
   const followerCount = user.followerCount ?? 0
   const isOwn = !!onAvatarPick
 
+  const [likes, setLikes] = useState<Record<string, boolean>>({})
+  const [favs, setFavs] = useState<Record<string, boolean>>({})
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
 
@@ -79,25 +105,21 @@ export function ProfileView({
     [user.posts, standalonePosts],
   )
 
-  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState('')
+  const [edit, dispatchEdit] = useReducer(editReducer, { photoId: null, value: '' } as EditState)
 
-  const startEdit = useCallback((photoId: string, currentCaption: string) => {
-    setEditingPhotoId(photoId)
-    setEditValue(currentCaption)
-  }, [])
+  const startEdit = (photoId: string, currentCaption: string) => {
+    dispatchEdit({ type: 'start', photoId, value: currentCaption })
+  }
 
   const saveEdit = useCallback((photoId: string) => {
-    if (editValue.trim()) {
-      onUpdateCaption?.(photoId, editValue.trim())
+    if (edit.value.trim()) {
+      onUpdateCaption?.(photoId, edit.value.trim())
     }
-    setEditingPhotoId(null)
-    setEditValue('')
-  }, [editValue, onUpdateCaption])
+    dispatchEdit({ type: 'save' })
+  }, [edit.value, onUpdateCaption])
 
   const cancelEdit = useCallback(() => {
-    setEditingPhotoId(null)
-    setEditValue('')
+    dispatchEdit({ type: 'cancel' })
   }, [])
 
   return (
@@ -126,6 +148,7 @@ export function ProfileView({
                 className="profile-view__name-edit-input"
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveName() }}
                 maxLength={30}
                 autoFocus
               />
@@ -173,6 +196,7 @@ export function ProfileView({
                   >
                     {post.photos.length > 1 ? (
                       <div className="profile-view__post-stack">
+                        <img className="profile-view__post-stack-sizer" src={post.photos[0].url} alt="" />
                         <div className="profile-view__post-stack-cards">
                           <img src={post.photos[0].url} alt="" />
                           <img src={post.photos[1].url} alt="" aria-hidden />
@@ -195,14 +219,17 @@ export function ProfileView({
                   </div>
 
                   <div className="profile-view__card-body">
-                    {editingPhotoId === post.id ? (
+                    {edit.photoId === photo.id ? (
                       <div className="profile-view__card-edit-row">
                         <input
                           type="text"
                           className="profile-view__card-edit-input"
-                          value={editValue}
+                          value={edit.value}
                           onChange={(e) => {
-                            if (e.target.value.length <= 50) setEditValue(e.target.value)
+                            if (e.target.value.length <= 50) dispatchEdit({ type: 'typing', value: e.target.value })
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(photo.id)
                           }}
                           maxLength={50}
                           autoFocus
@@ -211,7 +238,7 @@ export function ProfileView({
                         <button
                           type="button"
                           className="profile-view__card-edit-save"
-                          onClick={() => saveEdit(post.id)}
+                          onClick={() => saveEdit(photo.id)}
                         >
                           保存
                         </button>
@@ -231,12 +258,35 @@ export function ProfileView({
                       </div>
                     ) : null}
 
-                    {editingPhotoId !== post.id && isStandalone && isOwn && (
+                    <div className="profile-view__card-reactions">
+                      <button
+                        type="button"
+                        className={`profile-view__card-action-btn ${likes[post.id] ? 'profile-view__card-action-btn--active' : ''}`}
+                        onClick={async () => {
+                          const r = await onToggleLike?.(post.id)
+                          if (r !== null) setLikes((p) => ({ ...p, [post.id]: r! }))
+                        }}
+                      >
+                        {likes[post.id] ? '❤️' : '🤍'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`profile-view__card-action-btn ${favs[post.id] ? 'profile-view__card-action-btn--active' : ''}`}
+                        onClick={async () => {
+                          const r = await onToggleFavorite?.(post.id)
+                          if (r !== null) setFavs((p) => ({ ...p, [post.id]: r! }))
+                        }}
+                      >
+                        {favs[post.id] ? '⭐' : '☆'}
+                      </button>
+                    </div>
+
+                    {edit.photoId !== photo.id && isOwn && (
                       <div className="profile-view__card-actions">
                         <button
                           type="button"
                           className="profile-view__card-edit-btn"
-                          onClick={() => startEdit(post.id, photo.caption ?? '')}
+                          onClick={() => startEdit(photo.id, photo.caption ?? '')}
                         >
                           编辑
                         </button>
@@ -244,8 +294,13 @@ export function ProfileView({
                           type="button"
                           className="profile-view__card-delete-btn"
                           onClick={() => {
-                            if (!window.confirm('确定删除这张照片吗？')) return
-                            onDeletePhoto?.(post.id)
+                            if (post.photos.length > 1) {
+                              if (!window.confirm('确定删除这一组作品吗？')) return
+                              onDeletePost?.(post)
+                            } else {
+                              if (!window.confirm('确定删除这张照片吗？')) return
+                              onDeletePhoto?.(post.id)
+                            }
                           }}
                         >
                           删除

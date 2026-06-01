@@ -192,6 +192,9 @@ export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, postT
               onChange={(e) => {
                 if (e.target.value.length <= 50) setEditValue(e.target.value)
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveEdit()
+              }}
               maxLength={50}
               autoFocus
             />

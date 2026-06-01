@@ -5,6 +5,7 @@ import './UserPhotoCarousel.css'
 export type PreviewItem = {
   dataUrl: string
   caption: string
+  file?: File
 }
 
 type Props = {

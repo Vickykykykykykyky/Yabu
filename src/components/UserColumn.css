@@ -127,6 +127,38 @@
   flex-shrink: 0;
 }
 
+.user-column__reactions {
+  display: flex;
+  gap: 0.5rem;
+  align-self: flex-end;
+}
+
+.user-column__react-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.user-column__react-btn:hover {
+  transform: scale(1.2);
+}
+
+.user-column__float-heart {
+  position: fixed;
+  z-index: 1000;
+  font-size: 1.2rem;
+  pointer-events: none;
+  animation: heart-float 0.8s ease-out forwards;
+}
+
+@keyframes heart-float {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-20px, -60px) scale(1.5); }
+}
+
 .user-column__group-title {
   position: absolute;
   top: 2.8rem;

@@ -419,7 +419,6 @@
 }
 
 .profile-view__card-img {
-  aspect-ratio: 4 / 5;
   position: relative;
   background: #efefef;
   cursor: pointer;
@@ -438,9 +437,14 @@
 /* ---- 扇叠 Fan Stack ---- */
 
 .profile-view__post-stack {
-  width: 100%;
-  height: 100%;
   position: relative;
+}
+
+.profile-view__post-stack-sizer {
+  width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0;
 }
 
 .profile-view__post-stack-cards {
@@ -540,6 +544,34 @@
   min-height: 0;
 }
 
+.profile-view__card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-view__card-reactions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.1rem;
+}
+
+.profile-view__card-action-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.profile-view__card-action-btn:hover {
+  transform: scale(1.2);
+}
+
 .profile-view__card-actions {
   display: flex;
   gap: 0.5rem;
@@ -636,6 +668,22 @@
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.collection-view__title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #262626;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.collection-view__count {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #8e8e8e;
 }
 
 @media (max-width: 700px) {

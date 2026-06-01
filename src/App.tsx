@@ -12,7 +12,7 @@ import { uploadUserPhoto } from './lib/r2-api'
 import { isSupabaseEnabled } from './lib/supabase'
 import { uploadAvatarToSupabase, uploadPhotoToSupabase } from './lib/supabase-storage'
 import { formatSupabaseError } from './lib/supabase-errors'
-import { pickImageFiles } from './utils/file'
+import { pickImageFile } from './utils/file'
 import { compressImageFile, compressImageToBlob } from './utils/image'
 import { ExploreView } from './views/ExploreView'
 import { MessagesView } from './views/MessagesView'
@@ -21,6 +21,7 @@ import { ProfileView } from './views/ProfileView'
 import { ReelsView } from './views/ReelsView'
 import { SearchView } from './views/SearchView'
 import { AuthPage } from './views/AuthPage'
+import { CollectionView } from './views/CollectionView'
 import './App.css'
 
 const VIEW_TITLES: Record<NavView, string> = {
@@ -31,13 +32,15 @@ const VIEW_TITLES: Record<NavView, string> = {
   explore: '发现',
   notifications: '通知',
   profile: '个人主页',
+  likes: '点赞',
+  favorites: '收藏',
 }
 
 export default function App() {
   const auth = useAuth()
   const [activeView, setActiveView] = useState<NavView>(() => {
     const hash = window.location.hash.replace('#', '')
-    const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile']
+    const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile', 'likes', 'favorites']
     return valid.includes(hash as NavView) ? (hash as NavView) : 'home'
   })
 
@@ -48,7 +51,7 @@ export default function App() {
   useEffect(() => {
     const onPop = () => {
       const hash = window.location.hash.replace('#', '')
-      const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile']
+      const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile', 'likes', 'favorites']
       if (valid.includes(hash as NavView)) {
         setActiveView(hash as NavView)
       }
@@ -116,6 +119,8 @@ function AuthenticatedApp({
     addPost,
     removePhoto,
     updatePhotoCaption,
+    toggleLike,
+    toggleFavorite,
     sendMessage,
     markNotificationsRead,
     persistWarning,
@@ -127,8 +132,12 @@ function AuthenticatedApp({
 
   const shuffledUsers = useMemo(() => {
     const arr = [...users]
+    const seed = arr.map(u => u.id).sort().join('|')
+    let h = 0
+    for (let i = 0; i < seed.length; i++) { h = ((h << 5) - h) + seed.charCodeAt(i); h |= 0 }
+    const rand = () => { h = (h * 1103515245 + 12345) | 0; return (h >>> 0) / 0x100000000 }
     for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
+      const j = Math.floor(rand() * (i + 1))
       ;[arr[i], arr[j]] = [arr[j], arr[i]]
     }
     return arr
@@ -172,14 +181,10 @@ function AuthenticatedApp({
   }, [currentUserId, r2Enabled, r2Ready, updateUser])
 
   const handleUpload = useCallback(async () => {
-    const files = await pickImageFiles()
-    if (files.length === 0) return
+    const file = await pickImageFile()
+    if (!file) return
 
-    const items = await Promise.all(
-      files.map((f) => compressImageFile(f)),
-    )
-
-    setPreviewItems(items.map((dataUrl) => ({ dataUrl, caption: '' })))
+    setPreviewItems([{ dataUrl: URL.createObjectURL(file), caption: '', file }])
   }, [])
 
   const handleUploadConfirm = useCallback(
@@ -187,26 +192,26 @@ function AuthenticatedApp({
       setPreviewItems(null)
 
       try {
-        const uploaded: { url: string; caption?: string }[] = []
-        for (const item of items) {
-          if (r2Enabled) {
-            if (!r2Ready) {
-              window.alert('R2 API 未就绪，请先运行：npm run dev:api')
-              return
-            }
-            const blob = await (await fetch(item.dataUrl)).blob()
-            const meta = await uploadUserPhoto(currentUserId, blob)
-            uploaded.push({ url: meta.url, caption: item.caption })
-          } else if (isSupabaseEnabled()) {
-            const blob = await (await fetch(item.dataUrl)).blob()
-            const url = await uploadPhotoToSupabase(currentUserId, blob)
-            uploaded.push({ url, caption: item.caption })
-          } else {
-            uploaded.push({ url: item.dataUrl, caption: item.caption })
-          }
+        const file = (items[0] as any).file as File | undefined
+        const blob = file ?? await (await fetch(items[0].dataUrl)).blob()
+
+        let url: string
+        if (r2Enabled) {
+          if (!r2Ready) { window.alert('R2 API 未就绪'); return }
+          const meta = await uploadUserPhoto(currentUserId, blob)
+          url = meta.url
+        } else if (isSupabaseEnabled()) {
+          url = await uploadPhotoToSupabase(currentUserId, blob)
+        } else {
+          const dataUrl = await new Promise<string>(resolve => {
+            const r = new FileReader()
+            r.onload = () => resolve(r.result as string)
+            r.readAsDataURL(blob as Blob)
+          })
+          url = dataUrl
         }
 
-        await addPost(currentUserId, uploaded, title)
+        await addPost(currentUserId, [{ url, caption: items[0].caption }], title)
         refetchUsers()
       } catch (err) {
         window.alert(
@@ -296,7 +301,7 @@ function AuthenticatedApp({
                 还没有其他用户，点击 + 上传你的第一张照片吧
               </p>
             ) : (
-              <HomeFeed users={shuffledUsers} currentUserId={currentUserId} onViewPhoto={handleViewPhoto} onSelectUser={selectUser} />
+              <HomeFeed users={shuffledUsers} currentUserId={currentUserId} onViewPhoto={handleViewPhoto} onSelectUser={selectUser} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} />
             )
           )}
 
@@ -316,7 +321,13 @@ function AuthenticatedApp({
             <ExploreView users={users} onSelectUser={selectUser} />
           )}
           {activeView === 'notifications' && (
-            <NotificationsView notifications={notifications} />
+            <NotificationsView currentUserId={currentUserId} users={users} onMarkRead={markNotificationsRead} />
+          )}
+          {activeView === 'likes' && (
+            <CollectionView type="likes" userId={currentUserId} users={users} onViewPost={handleOpenPost} />
+          )}
+          {activeView === 'favorites' && (
+            <CollectionView type="favorites" userId={currentUserId} users={users} onViewPost={handleOpenPost} />
           )}
           {activeView === 'profile' && (() => {
             const isOwn = !viewingUserId || viewingUserId === currentUserId
@@ -333,6 +344,8 @@ function AuthenticatedApp({
                 onDeletePhoto={isOwn ? ((photoId: string) => removePhoto(currentUserId, photoId)) : undefined}
                 onUpdateCaption={isOwn ? ((photoId: string, caption: string) => updatePhotoCaption(currentUserId, photoId, caption)) : undefined}
                 onUpdateName={isOwn ? ((id: string, name: string) => updateUser(id, { displayName: name })) : undefined}
+                onToggleLike={toggleLike}
+                onToggleFavorite={toggleFavorite}
                 onLogout={isOwn ? onLogout : undefined}
               />
             )

@@ -27,6 +27,16 @@ type PostRow = {
   created_at: string
 }
 
+type NotificationRow = {
+  id: string
+  receiver_id: string
+  sender_id: string
+  type: string
+  post_id?: string | null
+  is_read: boolean
+  created_at: string
+}
+
 function rowsToPhotos(rows: PhotoRow[]): UserPhoto[] {
   return rows.map((r) => {
     const photo: UserPhoto = { id: r.id, url: r.url }
@@ -168,8 +178,157 @@ export async function registerProfileInDb(displayName: string): Promise<UserProf
     .single()
 
   if (error) throw error
-  return rowToProfile(data as ProfileRow)
+  return (data as { id: string }).id
 }
+
+export async function toggleLikeInDb(postId: string, profileId: string): Promise<boolean> {
+  const supabase = getSupabase()
+  const { data: existing } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('post_id', postId)
+    .eq('profile_id', profileId)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase.from('likes').delete().eq('id', existing.id)
+    if (error) throw error
+    await supabase.from('notifications')
+      .delete()
+      .eq('sender_id', profileId)
+      .eq('post_id', postId)
+      .eq('type', 'like')
+      .eq('is_read', false)
+    return false
+  } else {
+    const { error } = await supabase.from('likes').insert({ post_id: postId, profile_id: profileId })
+    if (error) throw error
+    const { data: post } = await supabase.from('posts').select('profile_id').eq('id', postId).maybeSingle()
+    if (post && post.profile_id !== profileId) {
+      const { data: existingNotif } = await supabase.from('notifications')
+        .select('id')
+        .eq('receiver_id', post.profile_id)
+        .eq('sender_id', profileId)
+        .eq('post_id', postId)
+        .eq('type', 'like')
+        .eq('is_read', false)
+        .maybeSingle()
+      if (existingNotif) {
+        await supabase.from('notifications').update({ created_at: new Date().toISOString() }).eq('id', existingNotif.id)
+      } else {
+        await supabase.from('notifications').insert({
+          receiver_id: post.profile_id,
+          sender_id: profileId,
+          type: 'like',
+          post_id: postId,
+        })
+      }
+    }
+    return true
+  }
+}
+
+export async function toggleFavoriteInDb(postId: string, profileId: string): Promise<boolean> {
+  const supabase = getSupabase()
+  const { data: existing } = await supabase
+    .from('favorites')
+    .select('id')
+    .eq('post_id', postId)
+    .eq('profile_id', profileId)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase.from('favorites').delete().eq('id', existing.id)
+    if (error) throw error
+    await supabase.from('notifications')
+      .delete()
+      .eq('sender_id', profileId)
+      .eq('post_id', postId)
+      .eq('type', 'collection')
+      .eq('is_read', false)
+    return false
+  } else {
+    const { error } = await supabase.from('favorites').insert({ post_id: postId, profile_id: profileId })
+    if (error) throw error
+    const { data: post } = await supabase.from('posts').select('profile_id').eq('id', postId).maybeSingle()
+    if (post && post.profile_id !== profileId) {
+      const { data: existingNotif } = await supabase.from('notifications')
+        .select('id')
+        .eq('receiver_id', post.profile_id)
+        .eq('sender_id', profileId)
+        .eq('post_id', postId)
+        .eq('type', 'collection')
+        .eq('is_read', false)
+        .maybeSingle()
+      if (existingNotif) {
+        await supabase.from('notifications').update({ created_at: new Date().toISOString() }).eq('id', existingNotif.id)
+      } else {
+        await supabase.from('notifications').insert({
+          receiver_id: post.profile_id,
+          sender_id: profileId,
+          type: 'collection',
+          post_id: postId,
+        })
+      }
+    }
+    return true
+  }
+}
+
+export async function fetchLikesCounts(postIds: string[]): Promise<Record<string, number>> {
+  if (postIds.length === 0) return {}
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('likes')
+    .select('post_id')
+    .in('post_id', postIds)
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    counts[row.post_id] = (counts[row.post_id] ?? 0) + 1
+  }
+  return counts
+}
+
+export async function fetchLikedPostIds(profileId: string): Promise<string[]> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('likes')
+    .select('post_id')
+    .eq('profile_id', profileId)
+  return (data ?? []).map((r) => r.post_id)
+}
+
+export async function fetchFavoritedPostIds(profileId: string): Promise<string[]> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('favorites')
+    .select('post_id')
+    .eq('profile_id', profileId)
+  return (data ?? []).map((r) => r.post_id)
+}
+
+export async function fetchUnreadNotificationCount(profileId: string): Promise<number> {
+  const supabase = getSupabase()
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('receiver_id', profileId)
+    .eq('is_read', false)
+  if (error) return 0
+  return count ?? 0
+}
+
+export async function fetchNotifications(profileId: string): Promise<NotificationRow[]> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('notifications')
+    .select('id, receiver_id, sender_id, type, post_id, is_read, created_at')
+    .eq('receiver_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return (data ?? []) as NotificationRow[]
+}
+
 
 /** @deprecated 使用 registerProfileInDb */
 export async function createProfileInDb(displayName: string): Promise<UserProfile> {
@@ -274,12 +433,14 @@ export async function updatePhotoCaptionInDb(
   if (!UUID_RE.test(photoId)) return
 
   const supabase = getSupabase()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('photos')
     .update({ caption })
     .eq('id', photoId)
+    .select('id')
 
   if (error) throw error
+  if (!data?.length) throw new Error('更新失败：照片不存在或无权限')
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -320,4 +481,167 @@ export async function insertPostInDb(
 
   if (error) throw error
   return (data as { id: string }).id
+}
+
+// ========== Chat ==========
+
+type ChatRoomRow = {
+  id: string
+  user1_id: string
+  user2_id: string
+  last_message_at: string
+  created_at: string
+}
+
+type ChatMessageRow = {
+  id: string
+  room_id: string
+  sender_id: string
+  content: string
+  image_url: string | null
+  is_read: boolean
+  created_at: string
+}
+
+export async function findOrCreateChatRoom(
+  user1Id: string,
+  user2Id: string,
+): Promise<string> {
+  const supabase = getSupabase()
+  const [a, b] = user1Id < user2Id ? [user1Id, user2Id] : [user2Id, user1Id]
+
+  const { data: existing } = await supabase
+    .from('chat_rooms')
+    .select('id')
+    .eq('user1_id', a)
+    .eq('user2_id', b)
+    .maybeSingle()
+
+  if (existing) return existing.id
+
+  const { data: created, error } = await supabase
+    .from('chat_rooms')
+    .insert({ user1_id: a, user2_id: b })
+    .select('id')
+    .single()
+
+  if (error) throw error
+  return created.id
+}
+
+export async function fetchChatRooms(userId: string): Promise<
+  { id: string; peerId: string; lastMessageAt: number; unreadCount: number; lastMessage?: string }[]
+> {
+  const supabase = getSupabase()
+  const { data: rooms, error } = await supabase
+    .from('chat_rooms')
+    .select('*')
+    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+    .order('last_message_at', { ascending: false })
+
+  if (error || !rooms) return []
+
+  const roomIds = (rooms as ChatRoomRow[]).map((r) => r.id)
+
+  const [{ data: lastMsgs }, { data: unread }] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('room_id, content')
+      .in('room_id', roomIds)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('messages')
+      .select('room_id')
+      .in('room_id', roomIds)
+      .eq('is_read', false)
+      .neq('sender_id', userId),
+  ])
+
+  const lastMsgMap = new Map<string, string>()
+  for (const m of lastMsgs ?? []) {
+    if (!lastMsgMap.has(m.room_id)) lastMsgMap.set(m.room_id, m.content)
+  }
+
+  const unreadMap = new Map<string, number>()
+  for (const m of unread ?? []) {
+    unreadMap.set(m.room_id, (unreadMap.get(m.room_id) ?? 0) + 1)
+  }
+
+  return (rooms as ChatRoomRow[]).map((r) => {
+    const peerId = r.user1_id === userId ? r.user2_id : r.user1_id
+    return {
+      id: r.id,
+      peerId,
+      lastMessageAt: new Date(r.last_message_at).getTime(),
+      unreadCount: unreadMap.get(r.id) ?? 0,
+      lastMessage: lastMsgMap.get(r.id),
+    }
+  })
+}
+
+export async function fetchMessages(
+  roomId: string,
+): Promise<ChatMessageRow[]> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: true })
+  return (data ?? []) as ChatMessageRow[]
+}
+
+export async function insertMessage(
+  roomId: string,
+  senderId: string,
+  content: string,
+  imageUrl?: string,
+): Promise<ChatMessageRow> {
+  const supabase = getSupabase()
+
+  const record: Record<string, string> = {
+    room_id: roomId,
+    sender_id: senderId,
+    content,
+  }
+  if (imageUrl) record.image_url = imageUrl
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert(record)
+    .select('*')
+    .single()
+
+  if (error) throw error
+
+  await supabase
+    .from('chat_rooms')
+    .update({ last_message_at: new Date().toISOString() })
+    .eq('id', roomId)
+
+  return data as unknown as ChatMessageRow
+}
+
+export async function markMessagesRead(
+  roomId: string,
+  userId: string,
+): Promise<void> {
+  const supabase = getSupabase()
+  await supabase
+    .from('messages')
+    .update({ is_read: true })
+    .eq('room_id', roomId)
+    .neq('sender_id', userId)
+    .eq('is_read', false)
+}
+
+export async function fetchTotalUnreadCount(userId: string): Promise<number> {
+  const supabase = getSupabase()
+  const { count, error } = await supabase
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_read', false)
+    .neq('sender_id', userId)
+  if (error) return 0
+  return count ?? 0
 }

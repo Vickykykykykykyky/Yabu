@@ -17,6 +17,10 @@ export type Post = {
   title?: string
   photos: UserPhoto[]
   createdAt: number
+  likeCount?: number
+  favoriteCount?: number
+  isLiked?: boolean
+  isFavorited?: boolean
 }
 
 export type UserProfile = {
@@ -39,6 +43,8 @@ export type NavView =
   | 'explore'
   | 'notifications'
   | 'profile'
+  | 'likes'
+  | 'favorites'
 
 export type Message = {
   id: string
@@ -47,11 +53,32 @@ export type Message = {
   createdAt: number
 }
 
+export type ChatRoom = {
+  id: string
+  user1Id: string
+  user2Id: string
+  lastMessageAt: number
+  createdAt: number
+  lastMessage?: string
+  unreadCount: number
+}
+
+export type ChatMessage = {
+  id: string
+  roomId: string
+  senderId: string
+  content: string
+  imageUrl?: string
+  isRead: boolean
+  createdAt: number
+}
+
 export type Notification = {
   id: string
   text: string
   createdAt: number
   read: boolean
+  targetUserId?: string
 }
 
 export type AppState = {

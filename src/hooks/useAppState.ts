@@ -4,12 +4,16 @@ import { checkR2Health, isR2Enabled, listUserPhotos } from '../lib/r2-api'
 import {
   deletePhotoInDb,
   fetchAllProfiles,
+  fetchNotifications,
+  fetchUnreadNotificationCount,
   insertPhotoInDb,
   insertPostInDb,
+  toggleLikeInDb,
+  toggleFavoriteInDb,
   updatePhotoCaptionInDb,
   updateProfileInDb,
 } from '../lib/supabase-profiles'
-import { isSupabaseEnabled } from '../lib/supabase'
+import { isSupabaseEnabled, getSupabase } from '../lib/supabase'
 import { formatSupabaseError } from '../lib/supabase-errors'
 import { isValidPhotoUrl } from '../utils/photos'
 import { appendPhoto, removePhotoById, withSyncedPhotos } from '../utils/user-photos'
@@ -109,8 +113,25 @@ function loadPersistedMeta(): Pick<AppState, 'messages' | 'notifications'> {
   }
 }
 
-async function loadUsers(): Promise<UserProfile[]> {
+async function loadUsers(currentUserId?: string): Promise<UserProfile[]> {
   const users = isSupabaseEnabled() ? await fetchAllProfiles() : loadLocalUsers()
+  if (isSupabaseEnabled() && currentUserId) {
+    const supabase = getSupabase()
+    try {
+      const [lRes, fRes] = await Promise.all([
+        supabase.from('likes').select('post_id').eq('profile_id', currentUserId),
+        supabase.from('favorites').select('post_id').eq('profile_id', currentUserId),
+      ])
+      const likedIds = new Set((lRes.data ?? []).map(r => r.post_id))
+      const favIds = new Set((fRes.data ?? []).map(r => r.post_id))
+      for (const u of users) {
+        for (const p of u.posts ?? []) {
+          p.isLiked = likedIds.has(p.id)
+          p.isFavorited = favIds.has(p.id)
+        }
+      }
+    } catch {}
+  }
   return users.map(withSyncedPhotos)
 }
 
@@ -123,9 +144,10 @@ export function useAppState(loggedInUserId: string) {
   const [r2Ready, setR2Ready] = useState(!isR2Enabled())
   const [supabaseReady, setSupabaseReady] = useState(!isSupabaseEnabled())
   const [usersLoading, setUsersLoading] = useState(true)
+  const [dbUnreadCount, setDbUnreadCount] = useState(0)
 
   const refetchUsers = useCallback(async () => {
-    const users = await loadUsers()
+    const users = await loadUsers(loggedInUserId)
     setState((prev) => ({
       ...prev,
       users,
@@ -136,6 +158,57 @@ export function useAppState(loggedInUserId: string) {
 
   useEffect(() => {
     setState((prev) => ({ ...prev, activeUserId: loggedInUserId }))
+  }, [loggedInUserId])
+
+  useEffect(() => {
+    if (!isSupabaseEnabled() || !supabaseReady) return
+    fetchUnreadNotificationCount(loggedInUserId).then(setDbUnreadCount).catch(() => {})
+  }, [supabaseReady, loggedInUserId])
+
+  const markNotificationsRead = useCallback(async () => {
+    if (!isSupabaseEnabled()) return
+    const supabase = getSupabase()
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('receiver_id', loggedInUserId)
+      .eq('is_read', false)
+    setDbUnreadCount(0)
+  }, [loggedInUserId])
+
+  useEffect(() => {
+    if (!isSupabaseEnabled()) return
+    const supabase = getSupabase()
+    const channel = supabase
+      .channel(`notifications-${loggedInUserId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `receiver_id=eq.${loggedInUserId}`,
+      }, () => {
+        setDbUnreadCount(c => c + 1)
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `receiver_id=eq.${loggedInUserId}`,
+      }, () => {
+        setDbUnreadCount(c => Math.max(0, c - 1))
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `receiver_id=eq.${loggedInUserId}`,
+      }, (payload) => {
+        if (payload.new.is_read && !payload.old.is_read) {
+          setDbUnreadCount(c => Math.max(0, c - 1))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [loggedInUserId])
 
   useEffect(() => {
@@ -151,7 +224,7 @@ export function useAppState(loggedInUserId: string) {
     ;(async () => {
       setUsersLoading(true)
       try {
-        const users = await loadUsers()
+        const users = await loadUsers(loggedInUserId)
         if (cancelled) return
         setState((prev) => ({
           ...prev,
@@ -368,16 +441,19 @@ export function useAppState(loggedInUserId: string) {
 
   const updatePhotoCaption = useCallback(async (userId: string, photoId: string, caption: string) => {
     setState((prev) => {
-      const nextUsers = prev.users.map((u) =>
-        u.id === userId
-          ? {
-              ...u,
-              photos: u.photos.map((p) =>
-                p.id === photoId ? { ...p, caption } : p,
-              ),
-            }
-          : u,
-      )
+      const nextUsers = prev.users.map((u) => {
+        if (u.id !== userId) return u
+        const nextPhotos = u.photos.map((p) =>
+          p.id === photoId ? { ...p, caption } : p,
+        )
+        const nextPosts = (u.posts ?? []).map((post) => ({
+          ...post,
+          photos: post.photos.map((p) =>
+            p.id === photoId ? { ...p, caption } : p,
+          ),
+        }))
+        return { ...u, photos: nextPhotos, posts: nextPosts }
+      })
       if (!isSupabaseEnabled()) {
         saveLocalUsers(nextUsers)
       }
@@ -410,14 +486,10 @@ export function useAppState(loggedInUserId: string) {
     }))
   }, [])
 
-  const markNotificationsRead = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => ({ ...n, read: true })),
-    }))
-  }, [])
 
-  const unreadCount = state.notifications.filter((n) => !n.read).length
+  const unreadCount = state.notifications.filter(
+    (n) => !n.read && (!n.targetUserId || n.targetUserId === loggedInUserId)
+  ).length
 
   const activeUser = withSyncedPhotos(
     state.users.find((u) => u.id === loggedInUserId) ?? {
@@ -432,11 +504,29 @@ export function useAppState(loggedInUserId: string) {
     },
   )
 
+  const toggleLike = useCallback(async (postId: string) => {
+    try {
+      return await toggleLikeInDb(postId, loggedInUserId)
+    } catch (err) {
+      setPersistWarning(`点赞失败：${formatSupabaseError(err)}`)
+      return null
+    }
+  }, [loggedInUserId])
+
+  const toggleFavorite = useCallback(async (postId: string) => {
+    try {
+      return await toggleFavoriteInDb(postId, loggedInUserId)
+    } catch (err) {
+      setPersistWarning(`收藏失败：${formatSupabaseError(err)}`)
+      return null
+    }
+  }, [loggedInUserId])
+
   return {
     users: state.users,
     messages: state.messages,
     notifications: state.notifications,
-    unreadCount,
+    unreadCount: dbUnreadCount || state.notifications.filter(n => !n.read).length,
     activeUser,
     currentUserId: loggedInUserId,
     persistWarning,
@@ -450,6 +540,8 @@ export function useAppState(loggedInUserId: string) {
     addPost,
     removePhoto,
     updatePhotoCaption,
+    toggleLike,
+    toggleFavorite,
     sendMessage,
     markNotificationsRead,
     refetchUsers,

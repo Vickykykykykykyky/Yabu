@@ -1,6 +1,8 @@
-import { memo, useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { UserProfile } from '../types'
 import { normalizePhotoUrls } from '../utils/photos'
+import { isSupabaseEnabled } from '../lib/supabase'
+import { getSupabase } from '../lib/supabase'
 import { UserPhotoCarousel } from './UserPhotoCarousel'
 import './UserColumn.css'
 
@@ -10,19 +12,52 @@ type Props = {
   isFullWidth?: boolean
   onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number, photoIds?: string[], isOwn?: boolean) => void
   onSelectUser?: (id: string) => void
+  onToggleLike?: (postId: string) => Promise<boolean | null>
+  onToggleFavorite?: (postId: string) => Promise<boolean | null>
 }
 
 function getInitials(name: string) {
   return name.slice(0, 2) || '?'
 }
 
-export const UserColumn = memo(function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUser }: Props) {
+export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUser, onToggleLike, onToggleFavorite }: Props) {
   const photos = normalizePhotoUrls(user.photoUrls)
   const captions = user.photos.map((p) => p.caption)
   const photoIds = user.photos.map((p) => p.id)
   const groupTitle = user.posts?.find((p) => p.photos.length > 1)?.title
+  const firstPostId = user.posts?.[0]?.id
 
+  const [likes, setLikes] = useState<Record<string, boolean>>({})
+  const [favs, setFavs] = useState<Record<string, boolean>>({})
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([])
+  const heartIdRef = useRef(0)
+  const loadedRef = useRef(false)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (loadedRef.current || !isSupabaseEnabled() || !user.id) return
+    loadedRef.current = true
+    const supabase = getSupabase()
+    const postIds = (user.posts ?? []).map(p => p.id).filter(Boolean)
+    if (postIds.length === 0) return
+    Promise.all([
+      supabase.from('likes').select('post_id').eq('profile_id', user.id).in('post_id', postIds),
+      supabase.from('favorites').select('post_id').eq('profile_id', user.id).in('post_id', postIds),
+    ]).then(([lRes, fRes]) => {
+      const l: Record<string, boolean> = {}
+      const f: Record<string, boolean> = {}
+      for (const row of lRes.data ?? []) { l[row.post_id] = true }
+      for (const row of fRes.data ?? []) { f[row.post_id] = true }
+      setLikes(l)
+      setFavs(f)
+    }).catch(() => {})
+  }, [user.id, user.posts])
+
+  const spawnHeart = (x: number, y: number) => {
+    const id = ++heartIdRef.current
+    setHearts(p => [...p, { id, x, y }])
+    setTimeout(() => setHearts(p => p.filter(h => h.id !== id)), 800)
+  }
 
   const getSpreadStyle = useCallback((i: number, total: number) => {
     const mid = (total - 1) / 2
@@ -102,7 +137,48 @@ export const UserColumn = memo(function UserColumn({ user, isMine, isFullWidth, 
         <UserPhotoCarousel photos={photos} captions={captions} photoIds={photoIds} label={user.displayName} isOwn={isMine} onViewPhoto={onViewPhoto} />
       )}
 
+      <div className="user-column__reactions">
+        <button className="user-column__react-btn" onClick={(e) => {
+          e.stopPropagation()
+          if (!firstPostId) return
+          const wasLiked = likes[firstPostId] ?? user.posts?.[0]?.isLiked
+          const next = !wasLiked
+          setLikes(p => ({ ...p, [firstPostId]: next }))
+          if (next) {
+            const rect = (e.target as HTMLElement).getBoundingClientRect()
+            spawnHeart(rect.left + rect.width / 2, rect.top)
+          }
+          onToggleLike?.(firstPostId).then(r => {
+            if (r !== null && r !== next) setLikes(p => ({ ...p, [firstPostId]: r }))
+          })
+        }}>
+          {firstPostId && (likes[firstPostId] ?? user.posts?.[0]?.isLiked) ? '❤️' : '🤍'}
+        </button>
+        <button className="user-column__react-btn" onClick={(e) => {
+          e.stopPropagation()
+          if (!firstPostId) return
+          const wasFav = favs[firstPostId] ?? user.posts?.[0]?.isFavorited
+          const next = !wasFav
+          setFavs(p => ({ ...p, [firstPostId]: next }))
+          onToggleFavorite?.(firstPostId).then(r => {
+            if (r !== null && r !== next) setFavs(p => ({ ...p, [firstPostId]: r }))
+          })
+        }}>
+          {firstPostId && (favs[firstPostId] ?? user.posts?.[0]?.isFavorited) ? '⭐' : '☆'}
+        </button>
+      </div>
+
+      {hearts.map(h => (
+        <span
+          key={h.id}
+          className="user-column__float-heart"
+          style={{ left: h.x, top: h.y }}
+        >
+          ❤️
+        </span>
+      ))}
+
       <span className="user-column__count">{photos.length} 张</span>
     </article>
   )
-})
+}

@@ -30,6 +30,8 @@ const NAV_ITEMS: { id: NavView; label: string; Icon: typeof IconHome }[] = [
   { id: 'search', label: '搜索', Icon: IconSearch },
   { id: 'explore', label: '发现', Icon: IconExplore },
   { id: 'notifications', label: '通知', Icon: IconHeart },
+  { id: 'likes', label: '点赞', Icon: IconHeart },
+  { id: 'favorites', label: '收藏', Icon: IconHeart },
 ]
 
 function getInitials(name: string) {

@@ -1,0 +1,14 @@
+{
+  "name": "yabu-r2-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.500.0",
+    "@aws-sdk/s3-request-presigner": "^3.500.0",
+    "busboy": "^1.6.0",
+    "dotenv": "^16.4.0"
+  }
+}
