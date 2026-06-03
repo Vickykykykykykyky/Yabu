@@ -84,6 +84,7 @@ export function NavSidebar({
           <button
             key={id}
             type="button"
+            data-nav={id}
             className={`nav-sidebar__item ${activeView === id ? 'nav-sidebar__item--active' : ''}`}
             onClick={() => {
               onNavigate(id)

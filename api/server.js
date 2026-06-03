@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
-import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { config } from 'dotenv'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -80,7 +80,7 @@ function sendJSON(res, status, data) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   })
   res.end(JSON.stringify(data))
@@ -112,6 +112,32 @@ async function handleUpload(userId, file, filename, contentType) {
   }
 }
 
+function keyFromDeletePayload(userId, payload) {
+  const rawKey = typeof payload?.key === 'string' ? payload.key.trim() : ''
+  if (rawKey && rawKey.startsWith(`${userId}/`)) return rawKey
+
+  const rawUrl = typeof payload?.url === 'string' ? payload.url.trim() : ''
+  if (!rawUrl) return ''
+
+  try {
+    const parsed = new URL(rawUrl)
+    const key = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+    return key.startsWith(`${userId}/`) ? key : ''
+  } catch {
+    return ''
+  }
+}
+
+async function handleDelete(userId, payload) {
+  const key = keyFromDeletePayload(userId, payload)
+  if (!key) {
+    return { ok: false, error: 'Invalid photo key' }
+  }
+
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
+  return { ok: true, key }
+}
+
 createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     return sendJSON(res, 200, { ok: true })
@@ -141,6 +167,12 @@ createServer(async (req, res) => {
         }
         const data = await handleUpload(userId, parsed.file, parsed.filename, parsed.contentType)
         return sendJSON(res, 201, data)
+      }
+
+      if (req.method === 'DELETE') {
+        const payload = await parseJSON(req)
+        const data = await handleDelete(userId, payload)
+        return sendJSON(res, data.ok ? 200 : 400, data)
       }
     }
 

@@ -21,6 +21,23 @@
   overflow: hidden;
 }
 
+@media (max-width: 767px) {
+  .upload-preview {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .upload-preview-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .upload-preview__deck {
+    min-height: 200px;
+  }
+}
+
 .upload-preview__header {
   padding: 1rem 1.25rem;
   border-bottom: 1px solid #efefef;

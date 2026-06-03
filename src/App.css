@@ -57,6 +57,18 @@
   flex-shrink: 0;
 }
 
+.app__header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app__header-logo {
+  width: 1.85rem;
+  height: 1.85rem;
+  flex-shrink: 0;
+}
+
 .app__logo {
   margin: 0;
   font-size: 1.75rem;
@@ -88,7 +100,24 @@
 @media (max-width: 900px) {
   .app__main {
     margin-right: 0;
-    padding: 1rem 1rem 5rem;
-    padding-right: calc(72px + 1rem);
+    padding: 1rem 1rem 5.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .app__main {
+    padding: 0.75rem 0.85rem 5.5rem;
+  }
+
+  .app__header {
+    margin-bottom: 1rem;
+  }
+
+  .app__logo {
+    font-size: 1.4rem;
+  }
+
+  .app__subtitle {
+    font-size: 0.8rem;
   }
 }

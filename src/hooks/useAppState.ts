@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loadLocalUsers, saveLocalUsers } from '../lib/local-users'
-import { checkR2Health, isR2Enabled, listUserPhotos } from '../lib/r2-api'
+import { checkR2Health, deleteUserPhoto, isR2Enabled, listUserPhotos } from '../lib/r2-api'
 import {
   deletePhotoInDb,
   fetchAllProfiles,
@@ -418,6 +418,21 @@ export function useAppState(loggedInUserId: string) {
   }, [])
 
   const removePhoto = useCallback(async (userId: string, photoId: string) => {
+    const user = state.users.find((u) => u.id === userId)
+    const photoUrl =
+      user?.photos.find((p) => p.id === photoId)?.url ??
+      user?.posts.flatMap((post) => post.photos).find((p) => p.id === photoId)?.url ??
+      ''
+
+    if (isR2Enabled() && photoUrl) {
+      try {
+        await deleteUserPhoto(userId, photoUrl)
+      } catch (err) {
+        setPersistWarning(`删除 R2 照片失败：${err instanceof Error ? err.message : '未知错误'}`)
+        throw err
+      }
+    }
+
     if (isSupabaseEnabled()) {
       try {
         await deletePhotoInDb(photoId)
@@ -436,7 +451,7 @@ export function useAppState(loggedInUserId: string) {
       }
       return { ...prev, users: nextUsers }
     })
-  }, [])
+  }, [state.users])
 
   const updatePhotoCaption = useCallback(async (userId: string, photoId: string, caption: string) => {
     setState((prev) => {
@@ -484,8 +499,6 @@ export function useAppState(loggedInUserId: string) {
       ].slice(0, 100),
     }))
   }, [])
-    (n) => !n.read && (!n.targetUserId || n.targetUserId === loggedInUserId)
-  ).length
 
   const activeUser = withSyncedPhotos(
     state.users.find((u) => u.id === loggedInUserId) ?? {

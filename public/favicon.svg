@@ -1,6 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="8" fill="#2a2a3d"/>
-  <circle cx="11" cy="13" r="4.5" fill="#FF4D6D"/>
-  <circle cx="21" cy="13" r="4.5" fill="#FFBE0B"/>
-  <circle cx="16" cy="21" r="4.5" fill="#06D6A0"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <radialGradient id="bg-blue-leak" cx="85%" cy="15%" r="90%">
+      <stop offset="0%" stop-color="#D0E8FF" stop-opacity="0.65"/>
+      <stop offset="40%" stop-color="#E6F2FF" stop-opacity="0.45"/>
+      <stop offset="75%" stop-color="#F2F8FF" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="200" height="200" fill="#FFFFFF"/>
+  <rect width="200" height="200" fill="url(#bg-blue-leak)"/>
+  <circle cx="88" cy="100" r="38" fill="#A8E6CF" opacity="0.35"/>
+  <circle cx="112" cy="100" r="38" fill="#FFD3B6" opacity="0.38"/>
+  <g stroke="#718096" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.55">
+    <path d="M 65,80 L 65,65 L 80,65"/>
+    <path d="M 135,80 L 135,65 L 120,65"/>
+    <path d="M 65,120 L 65,135 L 80,135"/>
+    <path d="M 135,120 L 135,135 L 120,135"/>
+  </g>
+  <circle cx="100" cy="100" r="1.5" fill="#718096" opacity="0.4"/>
 </svg>

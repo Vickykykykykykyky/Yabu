@@ -45,3 +45,16 @@ export async function uploadUserPhoto(userId: string, file: Blob): Promise<Photo
 
   return (await res.json()) as PhotoMeta
 }
+
+export async function deleteUserPhoto(userId: string, url: string): Promise<void> {
+  const res = await fetch(`/api/users/${encodeURIComponent(userId)}/photos`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(err.error ?? `删除失败 (${res.status})`)
+  }
+}

@@ -33,5 +33,12 @@ export function removePhotoById(
   photoId: string,
 ): UserProfile {
   const photos = user.photos.filter((p) => p.id !== photoId)
-  return withSyncedPhotos({ ...user, photos })
+  const posts = (user.posts ?? [])
+    .map((post) => ({
+      ...post,
+      photos: post.photos.filter((p) => p.id !== photoId),
+    }))
+    .filter((post) => post.photos.length > 0)
+
+  return withSyncedPhotos({ ...user, photos, posts })
 }

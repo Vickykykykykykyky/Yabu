@@ -1,4 +1,5 @@
 interface Env {
+  ASSETS: Fetcher
   PHOTOS: R2Bucket
   ALLOWED_ORIGIN?: string
 }
@@ -118,7 +119,7 @@ export default {
         return new Response(object.body, { headers })
       }
 
-      return json({ error: 'Not Found' }, 404, cors)
+      return env.ASSETS.fetch(request)
     } catch (err) {
       console.error(err)
       return json(

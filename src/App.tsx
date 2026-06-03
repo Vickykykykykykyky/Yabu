@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavSidebar } from './components/nav/NavSidebar'
+import { IconLogo } from './components/nav/NavIcons'
 import { UploadButton } from './components/UploadButton'
 import { UploadPreview } from './components/UploadPreview'
 import type { PreviewItem } from './components/UploadPreview'
@@ -112,7 +113,6 @@ function AuthenticatedApp({
     users,
     activeUser,
     currentUserId,
-    messages,
     unreadCount,
     updateUser,
     addPost,
@@ -120,7 +120,6 @@ function AuthenticatedApp({
     updatePhotoCaption,
     toggleLike,
     toggleFavorite,
-    sendMessage,
     markNotificationsRead,
     persistWarning,
     r2Enabled,
@@ -130,7 +129,7 @@ function AuthenticatedApp({
   } = useAppState(profileId)
 
   const shuffledUsers = useMemo(() => {
-    const arr = [...users]
+    const arr = [...users].filter((u) => u.photos.length > 0)
     const seed = arr.map(u => u.id).sort().join('|')
     let h = 0
     for (let i = 0; i < seed.length; i++) { h = ((h << 5) - h) + seed.charCodeAt(i); h |= 0 }
@@ -280,7 +279,10 @@ function AuthenticatedApp({
 
       <main className={`app__main ${activeView === 'home' ? 'app__main--home' : ''}`}>
         <header className="app__header">
-          <h1 className="app__logo">{pageTitle}</h1>
+          <div className="app__header-title">
+            <IconLogo className="app__header-logo" />
+            <h1 className="app__logo">{pageTitle}</h1>
+          </div>
           {activeView === 'home' && (
             <p className="app__subtitle">
               你好，{displayName} · 点击右侧 + 上传到你的照片墙
@@ -307,9 +309,7 @@ function AuthenticatedApp({
           {activeView === 'messages' && (
             <MessagesView
               users={users}
-              activeUser={activeUser}
-              messages={messages}
-              onSendMessage={sendMessage}
+              currentUserId={currentUserId}
             />
           )}
           {activeView === 'search' && (

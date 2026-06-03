@@ -34,3 +34,13 @@
   font-weight: 300;
   line-height: 1;
 }
+
+@media (max-width: 767px) {
+  .upload-button {
+    left: auto;
+    right: 1.25rem;
+    bottom: calc(56px + 1rem + env(safe-area-inset-bottom, 0px));
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+}

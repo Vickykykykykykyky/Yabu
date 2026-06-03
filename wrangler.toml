@@ -1,17 +1,15 @@
-# 本地 API：npm run dev:api  →  http://127.0.0.1:8787
-# 前端代理：Vite 把 /api 转发到 Worker
-name = "yabu-api"
+name = "yabu"
 main = "worker/index.ts"
-compatibility_date = "2025-03-01"
+compatibility_date = "2025-06-03"
+
+[vars]
+SUPABASE_URL = "https://pmajmgryddjdgstpfcfn.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_79EA0ZPrGuZRJpSf-raCIg_0nAWWINV"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
 
 [[r2_buckets]]
 binding = "PHOTOS"
-bucket_name = "yabu-photos"
-preview_bucket_name = "yabu-photos-preview"
-
-[dev]
-port = 8787
-local_protocol = "http"
-
-# 生产环境可在 Dashboard 创建同名 bucket，或：
-# npx wrangler r2 bucket create yabu-photos
+bucket_name = "yabusunnyday"

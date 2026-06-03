@@ -178,7 +178,7 @@ export async function registerProfileInDb(displayName: string): Promise<UserProf
     .single()
 
   if (error) throw error
-  return (data as { id: string }).id
+  return rowToProfile(data as ProfileRow)
 }
 
 export async function toggleLikeInDb(postId: string, profileId: string): Promise<boolean> {

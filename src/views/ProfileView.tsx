@@ -45,6 +45,7 @@ export function ProfileView({
   onAvatarPick,
   onOpenPost,
   onDeletePost,
+  onDeletePhoto,
   onUpdateCaption,
   onUpdateName,
   onToggleLike,
@@ -93,10 +94,6 @@ export function ProfileView({
     [standalonePhotos, user.id],
   )
 
-  const standaloneIds = useMemo(
-    () => new Set(standalonePhotos.map((p) => p.id)),
-    [standalonePhotos],
-  )
 
   const allPosts = useMemo(
     () => [...user.posts.filter((p) => p.photos.length > 0), ...standalonePosts],

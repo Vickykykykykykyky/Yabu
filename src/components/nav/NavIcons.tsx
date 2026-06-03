@@ -1,13 +1,35 @@
 type IconProps = { className?: string }
 
-/** 与 favicon 一致：深色底 + 三色亮圆点 */
+/** 取景框相机：左上浅蓝流光 + 双重光斑 + 四角定格线 */
 export function IconLogo({ className }: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="2" y="2" width="20" height="20" rx="5.5" fill="#2a2a3d" />
-      <circle cx="8.5" cy="10" r="3.2" fill="#FF4D6D" />
-      <circle cx="15.5" cy="10" r="3.2" fill="#FFBE0B" />
-      <circle cx="12" cy="15.8" r="3.2" fill="#06D6A0" />
+    <svg className={className} viewBox="0 0 200 200" fill="none" aria-hidden>
+      <defs>
+        <radialGradient id="bg-blue-leak" cx="85%" cy="15%" r="90%">
+          <stop offset="0%" stopColor="#D0E8FF" stopOpacity="0.65" />
+          <stop offset="40%" stopColor="#E6F2FF" stopOpacity="0.45" />
+          <stop offset="75%" stopColor="#F2F8FF" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="200" height="200" fill="#FFFFFF" />
+      <rect width="200" height="200" fill="url(#bg-blue-leak)" />
+      <circle cx="88" cy="100" r="38" fill="#A8E6CF" opacity="0.35" />
+      <circle cx="112" cy="100" r="38" fill="#FFD3B6" opacity="0.38" />
+      <g
+        stroke="#718096"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.55"
+      >
+        <path d="M 65,80 L 65,65 L 80,65" />
+        <path d="M 135,80 L 135,65 L 120,65" />
+        <path d="M 65,120 L 65,135 L 80,135" />
+        <path d="M 135,120 L 135,135 L 120,135" />
+      </g>
+      <circle cx="100" cy="100" r="1.5" fill="#718096" opacity="0.4" />
     </svg>
   )
 }
