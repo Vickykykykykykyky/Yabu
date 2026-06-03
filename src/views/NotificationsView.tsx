@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Notification, UserProfile } from '../types'
+import type { UserProfile } from '../types'
 import { getSupabase, isSupabaseEnabled } from '../lib/supabase'
 import './MediaViews.css'
 
@@ -47,9 +47,10 @@ export function NotificationsView({ currentUserId, users, onMarkRead }: Props) {
       .limit(20)
       .then(({ data }) => {
         setNotifications((data ?? []) as DbNotification[])
+        setLoading(false)
+      }, () => {
+        setLoading(false)
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
   }, [currentUserId])
 
   if (loading) return <div className="media-view--empty"><p>加载中...</p></div>

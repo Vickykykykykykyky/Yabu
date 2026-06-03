@@ -113,7 +113,6 @@ function AuthenticatedApp({
     activeUser,
     currentUserId,
     messages,
-    notifications,
     unreadCount,
     updateUser,
     addPost,
@@ -155,8 +154,7 @@ function AuthenticatedApp({
   } | null>(null)
 
   const handleAvatarPick = useCallback(async () => {
-    const files = await pickImageFiles()
-    const file = files[0]
+    const file = await pickImageFile()
     if (!file) return
     try {
       if (r2Enabled && r2Ready) {

@@ -45,8 +45,6 @@ export function ProfileView({
   onAvatarPick,
   onOpenPost,
   onDeletePost,
-  onOpenPhoto,
-  onDeletePhoto,
   onUpdateCaption,
   onUpdateName,
   onToggleLike,
@@ -182,7 +180,6 @@ export function ProfileView({
             <p className="profile-view__empty">还没有发布作品，点击 + 上传第一张照片</p>
           ) : (
             allPosts.map((post) => {
-              const isStandalone = standaloneIds.has(post.id)
               const photo = post.photos[0]
 
               return (

@@ -26,7 +26,6 @@ function chunkUsers(users: UserProfile[]): UserProfile[][] {
 
   const nextSize = () => {
     const remaining = others.length - oIdx
-    const min = lastWasSingle && remaining >= 2 ? 2 : 1
     return Math.min(3, remaining)
   }
 
@@ -60,7 +59,7 @@ export function HomeFeed({ users, currentUserId, onViewPhoto, onSelectUser, onTo
           className="home-feed__row"
           aria-label={rows.length > 1 ? `用户照片墙 第 ${rowIndex + 1} 行` : '用户照片墙'}
         >
-          {rowUsers.map((user, userIndex) => (
+          {rowUsers.map((user) => (
             <UserColumn
               key={user.id}
               user={user}

@@ -4,7 +4,6 @@ import { checkR2Health, isR2Enabled, listUserPhotos } from '../lib/r2-api'
 import {
   deletePhotoInDb,
   fetchAllProfiles,
-  fetchNotifications,
   fetchUnreadNotificationCount,
   insertPhotoInDb,
   insertPostInDb,
@@ -485,9 +484,6 @@ export function useAppState(loggedInUserId: string) {
       ].slice(0, 100),
     }))
   }, [])
-
-
-  const unreadCount = state.notifications.filter(
     (n) => !n.read && (!n.targetUserId || n.targetUserId === loggedInUserId)
   ).length
 
