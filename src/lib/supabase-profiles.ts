@@ -445,24 +445,17 @@ export async function updatePhotoCaptionInDb(
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function deletePhotoInDb(photoId: string) {
+// 通过 security definer RPC 删除照片，在数据库内部校验 profile_id 归属
+export async function deletePhotoInDb(photoId: string, profileId: string) {
+  // 非 UUID 格式的 photoId（如本地临时 ID）跳过数据库删除
   if (!UUID_RE.test(photoId)) return
 
   const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('photos')
-    .delete()
-    .eq('id', photoId)
-    .select('id')
+  // 调用 delete_own_photo RPC，传入 photo_id 和 profile_id 供函数校验
+  const { error } = await supabase
+    .rpc('delete_own_photo', { p_photo_id: photoId, p_profile_id: profileId })
 
   if (error) throw error
-  if (!data?.length) {
-    const err = new Error('照片未从数据库删除（可能缺少删除权限）') as Error & {
-      code?: string
-    }
-    err.code = 'PHOTO_DELETE_DENIED'
-    throw err
-  }
 }
 
 export async function insertPostInDb(

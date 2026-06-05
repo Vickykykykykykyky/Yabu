@@ -449,9 +449,10 @@ export function useAppState(loggedInUserId: string) {
       }
     }
 
+    // 删除数据库记录（带归属校验：RPC 内比对 profile_id）
     if (isSupabaseEnabled()) {
       try {
-        await deletePhotoInDb(photoId)
+        await deletePhotoInDb(photoId, userId)
       } catch (err) {
         setPersistWarning(`删除照片失败：${formatSupabaseError(err)}`)
         throw err
