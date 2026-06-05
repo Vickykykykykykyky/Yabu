@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useReducer, useState } from 'react'
 import type { Post, UserPhoto, UserProfile } from '../types'
+import { resolvePhotoUrl } from '../utils/photos'
 import './MediaViews.css'
 
 type EditState = { photoId: string | null; value: string }
@@ -82,23 +83,18 @@ export function ProfileView({
     [user.photos],
   )
 
-  const standalonePosts: Post[] = useMemo(
-    () =>
-      standalonePhotos.map((photo) => ({
-        id: photo.id,
-        profileId: user.id,
-        title: undefined,
-        photos: [photo],
-        createdAt: 0,
-      })),
-    [standalonePhotos, user.id],
-  )
+  const allPosts = useMemo(() => {
+    const fromPosts = (user.posts ?? []).filter((p) => p.photos.length > 0)
+    if (fromPosts.length > 0) return fromPosts
 
-
-  const allPosts = useMemo(
-    () => [...user.posts.filter((p) => p.photos.length > 0), ...standalonePosts],
-    [user.posts, standalonePosts],
-  )
+    return standalonePhotos.map((photo) => ({
+      id: `legacy:${photo.id}`,
+      profileId: user.id,
+      title: undefined,
+      photos: [photo],
+      createdAt: 0,
+    }))
+  }, [user.posts, standalonePhotos, user.id])
 
   const [edit, dispatchEdit] = useReducer(editReducer, { photoId: null, value: '' } as EditState)
 
@@ -190,17 +186,17 @@ export function ProfileView({
                   >
                     {post.photos.length > 1 ? (
                       <div className="profile-view__post-stack">
-                        <img className="profile-view__post-stack-sizer" src={post.photos[0].url} alt="" />
+                        <img className="profile-view__post-stack-sizer" src={resolvePhotoUrl(post.photos[0].url)} alt="" />
                         <div className="profile-view__post-stack-cards">
-                          <img src={post.photos[0].url} alt="" />
-                          <img src={post.photos[1].url} alt="" aria-hidden />
+                          <img src={resolvePhotoUrl(post.photos[0].url)} alt="" referrerPolicy="no-referrer" />
+                          <img src={resolvePhotoUrl(post.photos[1].url)} alt="" aria-hidden referrerPolicy="no-referrer" />
                           {post.photos.length > 2 && (
-                            <img src={post.photos[2].url} alt="" aria-hidden />
+                            <img src={resolvePhotoUrl(post.photos[2].url)} alt="" aria-hidden referrerPolicy="no-referrer" />
                           )}
                         </div>
                       </div>
                     ) : (
-                      <img src={photo.url} alt="" />
+                      <img src={resolvePhotoUrl(photo.url)} alt="" referrerPolicy="no-referrer" />
                     )}
                     {post.title && (
                       <span className="profile-view__thumb-title">{post.title}</span>
@@ -288,13 +284,13 @@ export function ProfileView({
                           type="button"
                           className="profile-view__card-delete-btn"
                           onClick={() => {
-                            if (post.photos.length > 1) {
-                              if (!window.confirm('确定删除这一组作品吗？')) return
-                              onDeletePost?.(post)
-                            } else {
+                            if (post.id.startsWith('legacy:')) {
                               if (!window.confirm('确定删除这张照片吗？')) return
-                              onDeletePhoto?.(post.id)
+                              onDeletePhoto?.(photo.id)
+                              return
                             }
+                            if (!window.confirm('确定删除这一组作品吗？')) return
+                            onDeletePost?.(post)
                           }}
                         >
                           删除

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loadLocalUsers, saveLocalUsers } from '../lib/local-users'
-import { checkR2Health, deleteUserPhoto, isR2Enabled, listUserPhotos } from '../lib/r2-api'
+import { checkR2Health, deleteUserPhoto, isR2Enabled } from '../lib/r2-api'
 import {
   deletePhotoInDb,
   deletePostInDb,
@@ -132,7 +132,17 @@ async function loadUsers(currentUserId?: string): Promise<UserProfile[]> {
       }
     } catch {}
   }
-  return users.map(withSyncedPhotos)
+  return users
+    .map((u) => {
+      const photos = u.photos.filter((p) => isValidPhotoUrl(p.url))
+      const posts = (u.posts ?? [])
+        .map((post) => ({
+          ...post,
+          photos: post.photos.filter((p) => isValidPhotoUrl(p.url)),
+        }))
+        .filter((post) => post.photos.length > 0)
+      return withSyncedPhotos({ ...u, photos, posts })
+    })
 }
 
 export function useAppState(loggedInUserId: string) {
@@ -282,36 +292,13 @@ export function useAppState(loggedInUserId: string) {
       if (!healthy) {
         setR2Ready(false)
         setPersistWarning(
-          '未连接到 Cloudflare API。请先运行：npm run dev:api（另开一个终端）',
+          '未连接到 R2 API。请先运行：npm run dev:all（或另开终端 npm run dev:api）',
         )
         return
       }
 
       setR2Ready(true)
       if (isSupabaseEnabled()) setPersistWarning(null)
-
-      try {
-        setState((prev) => {
-          Promise.all(
-            prev.users.map(async (u) => {
-              const photos = await listUserPhotos(u.id)
-              const r2Urls = photos.map((p) => p.url)
-              return { ...u, photoUrls: r2Urls.length > 0 ? r2Urls : u.photoUrls }
-            }),
-          ).then((usersWithPhotos) => {
-            if (!cancelled) {
-              setState((current) => ({ ...current, users: usersWithPhotos }))
-            }
-          })
-          return prev
-        })
-      } catch (err) {
-        if (!cancelled) {
-          setPersistWarning(
-            err instanceof Error ? err.message : '从 R2 加载照片失败',
-          )
-        }
-      }
     })()
 
     return () => {
@@ -379,15 +366,32 @@ export function useAppState(loggedInUserId: string) {
     if (normalized.length === 0) return
 
     let postId = `local-post-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`
+    const newPhotos: { id: string; url: string; caption?: string; postId: string }[] = []
+
     if (isSupabaseEnabled()) {
       try {
         postId = await insertPostInDb(userId, title)
         for (const it of normalized) {
-          await insertPhotoInDb(userId, it.url, it.caption, { postId })
+          const photoId = await insertPhotoInDb(userId, it.url, it.caption, { postId })
+          newPhotos.push({
+            id: photoId,
+            url: it.url,
+            caption: it.caption,
+            postId,
+          })
         }
       } catch (err) {
         setPersistWarning(`作品写入 Supabase 失败：${formatSupabaseError(err)}`)
         throw err
+      }
+    } else {
+      for (const it of normalized) {
+        newPhotos.push({
+          id: `local-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`,
+          url: it.url,
+          caption: it.caption,
+          postId,
+        })
       }
     }
 
@@ -402,12 +406,6 @@ export function useAppState(loggedInUserId: string) {
 
       const nextUsers = prev.users.map((u) => {
         if (u.id !== userId) return u
-        const newPhotos = normalized.map((it) => ({
-          id: `local-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`,
-          url: it.url,
-          caption: it.caption,
-          postId,
-        }))
         const photos = [...u.photos, ...newPhotos]
         const posts = [
           {
@@ -419,7 +417,7 @@ export function useAppState(loggedInUserId: string) {
           },
           ...(u.posts ?? []),
         ]
-        return { ...u, photos, posts }
+        return withSyncedPhotos({ ...u, photos, posts })
       })
 
       if (!isSupabaseEnabled()) {
@@ -508,7 +506,11 @@ export function useAppState(loggedInUserId: string) {
       if (!isSupabaseEnabled()) saveLocalUsers(nextUsers)
       return { ...prev, users: nextUsers }
     })
-  }, [isR2Enabled, isSupabaseEnabled])
+
+    if (isSupabaseEnabled()) {
+      await refetchUsers()
+    }
+  }, [isR2Enabled, isSupabaseEnabled, refetchUsers])
 
   const updatePhotoCaption = useCallback(async (userId: string, photoId: string, caption: string) => {
     setState((prev) => {

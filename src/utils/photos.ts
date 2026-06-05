@@ -18,13 +18,39 @@ export function isValidPhotoUrl(url: string): boolean {
   return true
 }
 
+/**
+ * 将 R2 公网直链转为同源 /api/photos/ 代理。
+ * 移动端（尤其安卓）直连 pub-*.r2.dev 常因网络/Referrer 导致加载失败。
+ */
+export function resolvePhotoUrl(url: string): string {
+  const t = url?.trim()
+  if (!t) return url
+  if (t.startsWith('/api/photos/') || t.startsWith('data:')) return t
+
+  try {
+    const parsed = new URL(t, typeof window !== 'undefined' ? window.location.origin : undefined)
+    if (parsed.hostname.endsWith('.r2.dev')) {
+      // 本地 dev 的 api/server 不提供 /api/photos GET，仍用 R2 直链
+      if (import.meta.env.DEV) return t
+
+      const key = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+      if (key) return `/api/photos/${key}`
+    }
+  } catch {
+    // 非 URL 字符串，原样返回
+  }
+
+  return t
+}
+
 export function normalizePhotoUrls(urls: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const url of urls) {
-    if (!isValidPhotoUrl(url) || seen.has(url)) continue
-    seen.add(url)
-    out.push(url)
+    const resolved = resolvePhotoUrl(url)
+    if (!isValidPhotoUrl(resolved) || seen.has(resolved)) continue
+    seen.add(resolved)
+    out.push(resolved)
   }
   return out
 }

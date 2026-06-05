@@ -127,6 +127,30 @@
   flex-shrink: 0;
 }
 
+.user-column__post-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-column__post-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.user-column__post-dot--active {
+  background: #e94560;
+  transform: scale(1.25);
+}
+
 .user-column__reactions {
   display: flex;
   gap: 0.5rem;

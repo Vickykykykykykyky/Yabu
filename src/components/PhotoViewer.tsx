@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { resolvePhotoUrl } from '../utils/photos'
 import './PhotoViewer.css'
 
 const MAX_VISIBLE = 5
@@ -44,6 +45,7 @@ export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, postT
   const [index, setIndex] = useState(startIndex)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
+  const resolvedUrls = useMemo(() => urls.map(resolvePhotoUrl), [urls])
 
   const cardCount = Math.min(urls.length, MAX_VISIBLE)
   const fan = getFanConfig(cardCount)
@@ -111,15 +113,15 @@ export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, postT
 
   const stackItems = useMemo(
     () =>
-      urls
+      resolvedUrls
         .map((url, i) => ({
           url,
           i,
-          depth: (i - index + urls.length) % urls.length,
+          depth: (i - index + resolvedUrls.length) % resolvedUrls.length,
         }))
         .filter(({ depth }) => depth < cardCount)
         .sort((a, b) => b.depth - a.depth),
-    [urls, index, cardCount],
+    [resolvedUrls, index, cardCount],
   )
 
   return (
@@ -148,7 +150,7 @@ export function PhotoViewer({ urls, captions, photoIds, startIndex, isOwn, postT
                 if (depth !== 0) setIndex(i)
               }}
             >
-              <img src={url} alt="" draggable={false} />
+              <img src={url} alt="" draggable={false} loading="eager" referrerPolicy="no-referrer" />
             </button>
           ))}
 

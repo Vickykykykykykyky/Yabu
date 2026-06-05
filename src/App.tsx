@@ -222,14 +222,15 @@ function AuthenticatedApp({
 
         if (urls.length > 0) {
           await addPost(currentUserId, urls, title)
-          refetchUsers()
+          await refetchUsers()
         }
       } catch (err) {
-        window.alert(
-          isSupabaseEnabled() && !r2Enabled ? formatSupabaseError(err) : err instanceof Error
+        const message = isSupabaseEnabled()
+          ? formatSupabaseError(err)
+          : err instanceof Error
             ? err.message
-            : '上传失败',
-        )
+            : '上传失败'
+        window.alert(message)
       }
     },
     [currentUserId, addPost, r2Enabled, r2Ready, refetchUsers],

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UserProfile } from '../types'
-import { normalizePhotoUrls } from '../utils/photos'
+import { normalizePhotoUrls, resolvePhotoUrl } from '../utils/photos'
 import { isSupabaseEnabled } from '../lib/supabase'
 import { getSupabase } from '../lib/supabase'
 import { UserPhotoCarousel } from './UserPhotoCarousel'
@@ -21,11 +21,23 @@ function getInitials(name: string) {
 }
 
 export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUser, onToggleLike, onToggleFavorite }: Props) {
-  const photos = normalizePhotoUrls(user.photoUrls)
-  const captions = user.photos.map((p) => p.caption)
-  const photoIds = user.photos.map((p) => p.id)
-  const groupTitle = user.posts?.find((p) => p.photos.length > 1)?.title
-  const firstPostId = user.posts?.[0]?.id
+  const posts = useMemo(
+    () => (user.posts ?? []).filter((p) => p.photos.length > 0),
+    [user.posts],
+  )
+  const [postIndex, setPostIndex] = useState(0)
+
+  useEffect(() => {
+    setPostIndex(0)
+  }, [user.id, posts.length])
+
+  const activePost = posts[postIndex] ?? posts[0]
+  const activePhotos = activePost?.photos ?? user.photos
+  const photos = normalizePhotoUrls(activePhotos.map((p) => resolvePhotoUrl(p.url)))
+  const captions = activePhotos.map((p) => p.caption)
+  const photoIds = activePhotos.map((p) => p.id)
+  const groupTitle = activePost?.title
+  const firstPostId = activePost?.id
 
   const [likes, setLikes] = useState<Record<string, boolean>>({})
   const [favs, setFavs] = useState<Record<string, boolean>>({})
@@ -109,8 +121,8 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
 
       {isFullWidth ? (
         <div className="user-column__spread">
-          {user.photos.map((photo, i) => {
-            const { z, scaleNum, left } = getSpreadStyle(i, user.photos.length)
+          {activePhotos.map((photo, i) => {
+            const { z, scaleNum, left } = getSpreadStyle(i, activePhotos.length)
             return (
               <button
                 key={photo.id}
@@ -125,7 +137,7 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
                 onMouseEnter={() => setHoverIdx(i)}
                 onMouseLeave={() => setHoverIdx(null)}
               >
-                <img className="user-column__spread-card-img" src={photo.url} alt="" />
+                <img className="user-column__spread-card-img" src={resolvePhotoUrl(photo.url)} alt="" loading="eager" referrerPolicy="no-referrer" />
                 {photo.caption && (
                   <div className="user-column__spread-card-caption">{photo.caption}</div>
                 )}
@@ -135,6 +147,22 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
         </div>
       ) : (
         <UserPhotoCarousel photos={photos} captions={captions} photoIds={photoIds} label={user.displayName} isOwn={isMine} onViewPhoto={onViewPhoto} />
+      )}
+
+      {posts.length > 1 && (
+        <div className="user-column__post-nav" role="tablist" aria-label="切换作品组">
+          {posts.map((post, i) => (
+            <button
+              key={post.id}
+              type="button"
+              role="tab"
+              aria-selected={i === postIndex}
+              aria-label={`第 ${i + 1} 组${post.title ? `：${post.title}` : ''}`}
+              className={`user-column__post-dot ${i === postIndex ? 'user-column__post-dot--active' : ''}`}
+              onClick={() => setPostIndex(i)}
+            />
+          ))}
+        </div>
       )}
 
       <div className="user-column__reactions">
@@ -178,7 +206,9 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
         </span>
       ))}
 
-      <span className="user-column__count">{photos.length} 张</span>
+      <span className="user-column__count">
+        {posts.length > 0 ? `${posts.length} 组` : `${photos.length} 张`}
+      </span>
     </article>
   )
 }

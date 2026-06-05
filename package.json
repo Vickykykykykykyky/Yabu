@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "node api/server.js",
+    "dev:r2": "wrangler dev --remote",
     "dev:all": "concurrently -k -n web,api -c blue,green \"npm run dev\" \"npm run dev:api\"",
     "build": "tsc -b && vite build",
     "build:api": "wrangler deploy --dry-run",

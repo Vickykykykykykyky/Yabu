@@ -34,7 +34,9 @@
   position: absolute;
   bottom: var(--stack-fan-bottom);
   left: 50%;
-  height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.5rem);
+  width: min(calc(100% - var(--stack-inset-x) * 2), 280px);
+  aspect-ratio: 5 / 7;
+  height: auto;
   max-height: calc(100% - var(--stack-inset-y) - var(--stack-fan-bottom) - 0.5rem);
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.9);
@@ -52,9 +54,9 @@
 }
 
 .photo-stack__card img {
+  width: 100%;
   height: 100%;
-  width: auto;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   border-radius: inherit;
   pointer-events: none;
@@ -177,4 +179,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .photo-stack__deck {
+    min-height: 240px;
+    flex: 0 0 auto;
+  }
+
+  .photo-stack__card {
+    width: min(72vw, 240px);
+    max-height: none;
+  }
 }

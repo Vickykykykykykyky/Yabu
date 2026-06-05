@@ -50,7 +50,7 @@ function rowsToPhotos(rows: PhotoRow[]): UserPhoto[] {
   })
 }
 
-function rowsToPosts(postRows: PostRow[], allPhotos: UserPhoto[]): Post[] {
+function rowsToPosts(postRows: PostRow[], allPhotos: UserPhoto[], profileId: string): Post[] {
   const photosByPost = new Map<string, UserPhoto[]>()
   const standalone: UserPhoto[] = []
   for (const ph of allPhotos) {
@@ -62,19 +62,33 @@ function rowsToPosts(postRows: PostRow[], allPhotos: UserPhoto[]): Post[] {
       standalone.push(ph)
     }
   }
-  return postRows.map((r) => ({
-    id: r.id,
-    profileId: r.profile_id,
-    title: r.title ?? undefined,
-    photos: photosByPost.get(r.id) ?? [],
-    createdAt: new Date(r.created_at).getTime(),
-  }))
+
+  const posts: Post[] = postRows
+    .map((r) => ({
+      id: r.id,
+      profileId: r.profile_id,
+      title: r.title ?? undefined,
+      photos: photosByPost.get(r.id) ?? [],
+      createdAt: new Date(r.created_at).getTime(),
+    }))
+    .filter((p) => p.photos.length > 0)
+
+  for (const ph of standalone) {
+    posts.push({
+      id: `legacy:${ph.id}`,
+      profileId,
+      photos: [ph],
+      createdAt: 0,
+    })
+  }
+
+  return posts.sort((a, b) => b.createdAt - a.createdAt)
 }
 
 function rowToProfile(p: ProfileRow, photoRows: PhotoRow[] = [], postRows: PostRow[] = []): UserProfile {
   const photos = rowsToPhotos(photoRows)
   const photoUrls = photos.map((ph) => ph.url)
-  const posts = rowsToPosts(postRows, photos)
+  const posts = rowsToPosts(postRows, photos, p.id)
   return {
     id: p.id,
     displayName: p.display_name,
@@ -115,6 +129,19 @@ export async function fetchProfileById(id: string): Promise<UserProfile | null> 
   if (profileError) throw profileError
   if (!profile) return null
 
+  let posts: PostRow[] = []
+  try {
+    const { data: postData, error: postError } = await supabase
+      .from('posts')
+      .select('id, profile_id, title, created_at')
+      .eq('profile_id', id)
+      .order('created_at', { ascending: false })
+    if (postError) throw postError
+    posts = (postData ?? []) as PostRow[]
+  } catch {
+    posts = []
+  }
+
   const { data: photos, error: photoError } = await supabase
     .from('photos')
     .select('id, profile_id, url, caption, original_url, thumbnail_url, width, height, post_id')
@@ -123,7 +150,7 @@ export async function fetchProfileById(id: string): Promise<UserProfile | null> 
 
   if (photoError) throw photoError
 
-  return rowToProfile(profile as ProfileRow, (photos ?? []) as PhotoRow[])
+  return rowToProfile(profile as ProfileRow, (photos ?? []) as PhotoRow[], posts)
 }
 
 type RegisterProfileJson = {

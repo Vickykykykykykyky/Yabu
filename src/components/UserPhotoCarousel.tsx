@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { resolvePhotoUrl } from '../utils/photos'
 import './UserPhotoCarousel.css'
 
 const MAX_VISIBLE = 5
@@ -53,12 +54,14 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, capti
   const [index, setIndex] = useState(0)
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
 
+  const resolvedPhotos = useMemo(() => photos.map(resolvePhotoUrl), [photos])
+
   const visible = useMemo(
-    () => [...photos].reverse().filter((url) => !hidden.has(url)),
-    [photos, hidden],
+    () => [...resolvedPhotos].reverse().filter((url) => !hidden.has(url)),
+    [resolvedPhotos, hidden],
   )
 
-  const currentCaption = captions?.[photos.length - 1 - index]
+  const currentCaption = captions?.[resolvedPhotos.length - 1 - index]
 
   const cardCount = Math.min(visible.length, MAX_VISIBLE)
   const fan = getFanConfig(cardCount)
@@ -128,15 +131,17 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, capti
               aria-label={isTop ? `当前第 ${index + 1} 张` : `查看第 ${i + 1} 张`}
               onClick={() => {
                 if (isTop) {
-                  const originalIndex = photos.indexOf(visible[index])
-                  onViewPhoto?.(photos, captions ?? [], originalIndex >= 0 ? originalIndex : 0, photoIds, isOwn)
+                  const originalIndex = resolvedPhotos.indexOf(visible[index])
+                  onViewPhoto?.(resolvedPhotos, captions ?? [], originalIndex >= 0 ? originalIndex : 0, photoIds, isOwn)
                 } else setIndex(i)
               }}
             >
               <img
                 src={url}
                 alt=""
-                loading="lazy"
+                loading={isTop ? 'eager' : 'lazy'}
+                decoding="async"
+                referrerPolicy="no-referrer"
                 draggable={false}
                 onError={() => onImageError(url)}
               />
