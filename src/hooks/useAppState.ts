@@ -159,19 +159,33 @@ export function useAppState(loggedInUserId: string) {
     setState((prev) => ({ ...prev, activeUserId: loggedInUserId }))
   }, [loggedInUserId])
 
+  const refetchUnreadCount = useCallback(async () => {
+    if (!isSupabaseEnabled() || !loggedInUserId) return
+    const count = await fetchUnreadNotificationCount(loggedInUserId)
+    setDbUnreadCount(count)
+  }, [loggedInUserId])
+
   useEffect(() => {
     if (!isSupabaseEnabled() || !supabaseReady) return
     fetchUnreadNotificationCount(loggedInUserId).then(setDbUnreadCount).catch(() => {})
   }, [supabaseReady, loggedInUserId])
 
   const markNotificationsRead = useCallback(async () => {
+    setState((prev) => ({
+      ...prev,
+      notifications: prev.notifications.map((n) => ({ ...n, read: true })),
+    }))
     if (!isSupabaseEnabled()) return
     const supabase = getSupabase()
-    await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('receiver_id', loggedInUserId)
       .eq('is_read', false)
+    if (error) {
+      console.error('标记通知已读失败:', error)
+      return
+    }
     setDbUnreadCount(0)
   }, [loggedInUserId])
 
@@ -202,7 +216,9 @@ export function useAppState(loggedInUserId: string) {
         table: 'notifications',
         filter: `receiver_id=eq.${loggedInUserId}`,
       }, (payload) => {
-        if (payload.new.is_read && !payload.old.is_read) {
+        const wasUnread = payload.old?.is_read === false
+        const nowRead = payload.new?.is_read === true
+        if (nowRead && wasUnread) {
           setDbUnreadCount(c => Math.max(0, c - 1))
         }
       })
@@ -535,7 +551,7 @@ export function useAppState(loggedInUserId: string) {
     users: state.users,
     messages: state.messages,
     notifications: state.notifications,
-    unreadCount: dbUnreadCount || state.notifications.filter(n => !n.read).length,
+    unreadCount: isSupabaseEnabled() ? dbUnreadCount : state.notifications.filter(n => !n.read).length,
     activeUser,
     currentUserId: loggedInUserId,
     persistWarning,
@@ -553,6 +569,7 @@ export function useAppState(loggedInUserId: string) {
     toggleFavorite,
     sendMessage,
     markNotificationsRead,
+    refetchUnreadCount,
     refetchUsers,
   }
 }

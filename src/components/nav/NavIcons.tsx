@@ -24,10 +24,10 @@ export function IconLogo({ className }: IconProps) {
         fill="none"
         opacity="0.55"
       >
-        <path d="M 65,80 L 65,65 L 80,65" />
-        <path d="M 135,80 L 135,65 L 120,65" />
-        <path d="M 65,120 L 65,135 L 80,135" />
-        <path d="M 135,120 L 135,135 L 120,135" />
+        <path d="M 65,76 L 65,68 Q 65,65 68,65 L 76,65" />
+        <path d="M 135,76 L 135,68 Q 135,65 132,65 L 124,65" />
+        <path d="M 65,124 L 65,132 Q 65,135 68,135 L 76,135" />
+        <path d="M 135,124 L 135,132 Q 135,135 132,135 L 124,135" />
       </g>
       <circle cx="100" cy="100" r="1.5" fill="#718096" opacity="0.4" />
     </svg>

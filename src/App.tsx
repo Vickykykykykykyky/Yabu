@@ -13,7 +13,7 @@ import { uploadUserPhoto } from './lib/r2-api'
 import { isSupabaseEnabled } from './lib/supabase'
 import { uploadAvatarToSupabase, uploadPhotoToSupabase } from './lib/supabase-storage'
 import { formatSupabaseError } from './lib/supabase-errors'
-import { pickImageFile } from './utils/file'
+import { pickImageFile, pickImageFiles } from './utils/file'
 import { compressImageFile, compressImageToBlob } from './utils/image'
 import { ExploreView } from './views/ExploreView'
 import { MessagesView } from './views/MessagesView'
@@ -121,6 +121,7 @@ function AuthenticatedApp({
     toggleLike,
     toggleFavorite,
     markNotificationsRead,
+    refetchUnreadCount,
     persistWarning,
     r2Enabled,
     r2Ready,
@@ -178,10 +179,16 @@ function AuthenticatedApp({
   }, [currentUserId, r2Enabled, r2Ready, updateUser])
 
   const handleUpload = useCallback(async () => {
-    const file = await pickImageFile()
-    if (!file) return
+    const files = await pickImageFiles()
+    if (files.length === 0) return
 
-    setPreviewItems([{ dataUrl: URL.createObjectURL(file), caption: '', file }])
+    setPreviewItems(
+      files.map((file) => ({
+        dataUrl: URL.createObjectURL(file),
+        caption: '',
+        file,
+      })),
+    )
   }, [])
 
   const handleUploadConfirm = useCallback(
@@ -189,27 +196,33 @@ function AuthenticatedApp({
       setPreviewItems(null)
 
       try {
-        const file = (items[0] as any).file as File | undefined
-        const blob = file ?? await (await fetch(items[0].dataUrl)).blob()
+        const urls: { url: string; caption?: string }[] = []
 
-        let url: string
-        if (r2Enabled) {
-          if (!r2Ready) { window.alert('R2 API 未就绪'); return }
-          const meta = await uploadUserPhoto(currentUserId, blob)
-          url = meta.url
-        } else if (isSupabaseEnabled()) {
-          url = await uploadPhotoToSupabase(currentUserId, blob)
-        } else {
-          const dataUrl = await new Promise<string>(resolve => {
-            const r = new FileReader()
-            r.onload = () => resolve(r.result as string)
-            r.readAsDataURL(blob as Blob)
-          })
-          url = dataUrl
+        for (const item of items) {
+          const file = (item as any).file as File | undefined
+          const blob = file ?? await (await fetch(item.dataUrl)).blob()
+
+          let url: string
+          if (r2Enabled) {
+            if (!r2Ready) { window.alert('R2 API 未就绪'); return }
+            const meta = await uploadUserPhoto(currentUserId, blob)
+            url = meta.url
+          } else if (isSupabaseEnabled()) {
+            url = await uploadPhotoToSupabase(currentUserId, blob)
+          } else {
+            url = await new Promise<string>(resolve => {
+              const r = new FileReader()
+              r.onload = () => resolve(r.result as string)
+              r.readAsDataURL(blob as Blob)
+            })
+          }
+          urls.push({ url, caption: item.caption || undefined })
         }
 
-        await addPost(currentUserId, [{ url, caption: items[0].caption }], title)
-        refetchUsers()
+        if (urls.length > 0) {
+          await addPost(currentUserId, urls, title)
+          refetchUsers()
+        }
       } catch (err) {
         window.alert(
           isSupabaseEnabled() && !r2Enabled ? formatSupabaseError(err) : err instanceof Error
@@ -319,7 +332,7 @@ function AuthenticatedApp({
             <ExploreView users={users} onSelectUser={selectUser} />
           )}
           {activeView === 'notifications' && (
-            <NotificationsView currentUserId={currentUserId} users={users} onMarkRead={markNotificationsRead} />
+            <NotificationsView currentUserId={currentUserId} users={users} onMarkRead={markNotificationsRead} onRefetchUnread={refetchUnreadCount} />
           )}
           {activeView === 'likes' && (
             <CollectionView type="likes" userId={currentUserId} users={users} onViewPost={handleOpenPost} />

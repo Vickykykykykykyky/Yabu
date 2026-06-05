@@ -119,6 +119,40 @@ export default {
         return new Response(object.body, { headers })
       }
 
+      const deleteMatch = url.pathname.match(/^\/api\/users\/([^/]+)\/photos$/)
+      if (deleteMatch && request.method === 'DELETE') {
+        const userId = decodeURIComponent(deleteMatch[1])
+        let payload: { url?: string; key?: string } = {}
+        try {
+          payload = (await request.json()) as Record<string, unknown>
+        } catch {
+          // ignore parse errors
+        }
+
+        const extractKey = (raw: string): string => {
+          try {
+            const parsed = new URL(raw)
+            const path = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+            const apiMatch = path.match(/^api\/photos\/(.+)$/)
+            if (apiMatch) return apiMatch[1]
+            return path
+          } catch {
+            return raw.replace(/^\/+/, '')
+          }
+        }
+
+        const key =
+          (typeof payload.key === 'string' && payload.key.startsWith(`photos/${userId}/`)
+            ? payload.key
+            : '') ||
+          (typeof payload.url === 'string' ? extractKey(payload.url) : '')
+
+        if (!key) return json({ error: '无效的照片标识' }, 400, cors)
+
+        await env.PHOTOS.delete(key)
+        return json({ ok: true, key }, 200, cors)
+      }
+
       return env.ASSETS.fetch(request)
     } catch (err) {
       console.error(err)

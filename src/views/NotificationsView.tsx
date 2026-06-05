@@ -6,7 +6,8 @@ import './MediaViews.css'
 type Props = {
   currentUserId: string
   users: UserProfile[]
-  onMarkRead?: () => void
+  onMarkRead?: () => Promise<void> | void
+  onRefetchUnread?: () => Promise<void> | void
 }
 
 type DbNotification = {
@@ -31,29 +32,76 @@ function getActionText(type: string) {
   return '关注了你'
 }
 
-export function NotificationsView({ currentUserId, users, onMarkRead }: Props) {
+export function NotificationsView({ currentUserId, users, onMarkRead, onRefetchUnread }: Props) {
   const [notifications, setNotifications] = useState<DbNotification[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    onMarkRead?.()
-    if (!isSupabaseEnabled()) { setLoading(false); return }
-    const supabase = getSupabase()
-    supabase
-      .from('notifications')
-      .select('id, sender_id, type, post_id, created_at')
-      .eq('receiver_id', currentUserId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-      .then(({ data }) => {
-        setNotifications((data ?? []) as DbNotification[])
-        setLoading(false)
-      }, () => {
-        setLoading(false)
-      })
-  }, [currentUserId])
+    let cancelled = false
+
+    ;(async () => {
+      setLoading(true)
+      setError(null)
+
+      // 先标记已读，再查询列表，避免竞态
+      try {
+        await onMarkRead?.()
+      } catch {
+        // 标记失败不影响列表加载
+      }
+
+      if (!isSupabaseEnabled()) {
+        if (!cancelled) setLoading(false)
+        return
+      }
+
+      const supabase = getSupabase()
+      try {
+        const { data, error: queryError } = await supabase
+          .from('notifications')
+          .select('id, sender_id, type, post_id, created_at')
+          .eq('receiver_id', currentUserId)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        if (cancelled) return
+
+        if (queryError) {
+          setError('加载通知失败')
+          setNotifications([])
+        } else {
+          setNotifications((data ?? []) as DbNotification[])
+        }
+      } catch {
+        if (!cancelled) {
+          setError('加载通知失败')
+          setNotifications([])
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+
+      // 列表加载完后，重新拉一次未读数以校准红点
+      try {
+        await onRefetchUnread?.()
+      } catch {
+        // 忽略
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [currentUserId, onMarkRead, onRefetchUnread])
 
   if (loading) return <div className="media-view--empty"><p>加载中...</p></div>
+
+  if (error) {
+    return (
+      <div className="media-view--empty">
+        <p>{error}</p>
+      </div>
+    )
+  }
 
   if (notifications.length === 0) {
     return (
