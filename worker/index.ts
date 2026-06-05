@@ -102,7 +102,7 @@ export default {
       }
 
       const getMatch = url.pathname.match(/^\/api\/photos\/(.+)$/)
-      if (getMatch && request.method === 'GET') {
+      if (getMatch && (request.method === 'GET' || request.method === 'HEAD')) {
         const key = decodeURIComponent(getMatch[1])
         const object = await env.PHOTOS.get(key)
         if (!object) {
@@ -115,6 +115,11 @@ export default {
           object.httpMetadata?.contentType ?? 'image/jpeg',
         )
         headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+        headers.set('Content-Length', String(object.size))
+
+        if (request.method === 'HEAD') {
+          return new Response(null, { status: 200, headers })
+        }
 
         return new Response(object.body, { headers })
       }

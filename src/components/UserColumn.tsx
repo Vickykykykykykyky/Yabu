@@ -20,24 +20,68 @@ function getInitials(name: string) {
   return name.slice(0, 2) || '?'
 }
 
+function postIndexForPhotoIndex(postCount: number, postLengths: number[], photoIndex: number): number {
+  let acc = 0
+  for (let i = 0; i < postCount; i++) {
+    acc += postLengths[i]
+    if (photoIndex < acc) return i
+  }
+  return Math.max(0, postCount - 1)
+}
+
 export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUser, onToggleLike, onToggleFavorite }: Props) {
   const posts = useMemo(
     () => (user.posts ?? []).filter((p) => p.photos.length > 0),
     [user.posts],
   )
   const [postIndex, setPostIndex] = useState(0)
+  const [carouselIndex, setCarouselIndex] = useState(0)
+
+  const postStartIndices = useMemo(() => {
+    const starts: number[] = []
+    let n = 0
+    for (const post of posts) {
+      starts.push(n)
+      n += post.photos.length
+    }
+    return starts
+  }, [posts])
+
+  const postLengths = useMemo(() => posts.map((p) => p.photos.length), [posts])
 
   useEffect(() => {
     setPostIndex(0)
+    setCarouselIndex(0)
   }, [user.id, posts.length])
 
   const activePost = posts[postIndex] ?? posts[0]
-  const activePhotos = activePost?.photos ?? user.photos
-  const photos = normalizePhotoUrls(activePhotos.map((p) => resolvePhotoUrl(p.url)))
-  const captions = activePhotos.map((p) => p.caption)
-  const photoIds = activePhotos.map((p) => p.id)
+  const stackPhotos = useMemo(() => posts.flatMap((p) => p.photos), [posts])
+  const displayPhotos = isFullWidth ? (activePost?.photos ?? user.photos) : stackPhotos
+  const photos = normalizePhotoUrls(displayPhotos.map((p) => resolvePhotoUrl(p.url)))
+  const captions = displayPhotos.map((p) => p.caption)
+  const photoIds = displayPhotos.map((p) => p.id)
   const groupTitle = activePost?.title
   const firstPostId = activePost?.id
+
+  const handleCarouselIndexChange = useCallback(
+    (visibleIdx: number) => {
+      const flatIdx = Math.max(0, displayPhotos.length - 1 - visibleIdx)
+      setCarouselIndex(flatIdx)
+      setPostIndex(postIndexForPhotoIndex(posts.length, postLengths, flatIdx))
+    },
+    [displayPhotos.length, postLengths, posts.length],
+  )
+
+  const carouselVisibleIndex =
+    displayPhotos.length > 0 ? displayPhotos.length - 1 - carouselIndex : 0
+
+  const handlePostNav = useCallback(
+    (i: number) => {
+      setPostIndex(i)
+      setCarouselIndex(postStartIndices[i] ?? 0)
+    },
+    [postStartIndices],
+  )
 
   const [likes, setLikes] = useState<Record<string, boolean>>({})
   const [favs, setFavs] = useState<Record<string, boolean>>({})
@@ -74,13 +118,13 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
   const getSpreadStyle = useCallback((i: number, total: number) => {
     const mid = (total - 1) / 2
     const restOffset = i - mid
-    const spreadFactor = Math.min(22, 80 / total)
+    // 仅控制横向间距，卡片尺寸见 CSS 固定值
+    const spreadFactor = total <= 1 ? 0 : Math.min(22, 88 / total)
     const left = 50 + restOffset * spreadFactor
 
     const center = hoverIdx ?? Math.floor(mid)
     const hovOff = Math.abs(i - center)
-    const scaleFactor = Math.min(0.12, 0.8 / total)
-    const scaleNum = 1 - hovOff * scaleFactor
+    const scaleNum = 1 - hovOff * 0.06
     const z = total - hovOff
     return { z, scaleNum, left }
   }, [hoverIdx])
@@ -121,8 +165,8 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
 
       {isFullWidth ? (
         <div className="user-column__spread">
-          {activePhotos.map((photo, i) => {
-            const { z, scaleNum, left } = getSpreadStyle(i, activePhotos.length)
+          {displayPhotos.map((photo, i) => {
+            const { z, scaleNum, left } = getSpreadStyle(i, displayPhotos.length)
             return (
               <button
                 key={photo.id}
@@ -130,6 +174,7 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
                 className="user-column__spread-card"
                 style={{
                   transform: `translateX(-50%) scale(${scaleNum})`,
+                  transformOrigin: '50% 100%',
                   zIndex: z,
                   left: `${left}%`,
                 }}
@@ -137,7 +182,9 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
                 onMouseEnter={() => setHoverIdx(i)}
                 onMouseLeave={() => setHoverIdx(null)}
               >
-                <img className="user-column__spread-card-img" src={resolvePhotoUrl(photo.url)} alt="" loading="eager" referrerPolicy="no-referrer" />
+                <div className="user-column__spread-card-frame">
+                  <img className="user-column__spread-card-img" src={resolvePhotoUrl(photo.url)} alt="" loading="eager" referrerPolicy="no-referrer" />
+                </div>
                 {photo.caption && (
                   <div className="user-column__spread-card-caption">{photo.caption}</div>
                 )}
@@ -146,7 +193,16 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
           })}
         </div>
       ) : (
-        <UserPhotoCarousel photos={photos} captions={captions} photoIds={photoIds} label={user.displayName} isOwn={isMine} onViewPhoto={onViewPhoto} />
+        <UserPhotoCarousel
+          photos={photos}
+          captions={captions}
+          photoIds={photoIds}
+          label={user.displayName}
+          isOwn={isMine}
+          activeIndex={carouselVisibleIndex}
+          onActiveIndexChange={handleCarouselIndexChange}
+          onViewPhoto={onViewPhoto}
+        />
       )}
 
       {posts.length > 1 && (
@@ -159,7 +215,7 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
               aria-selected={i === postIndex}
               aria-label={`第 ${i + 1} 组${post.title ? `：${post.title}` : ''}`}
               className={`user-column__post-dot ${i === postIndex ? 'user-column__post-dot--active' : ''}`}
-              onClick={() => setPostIndex(i)}
+              onClick={() => handlePostNav(i)}
             />
           ))}
         </div>

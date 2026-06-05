@@ -25,7 +25,7 @@
   --stack-fan-bottom: 2.75rem;
   position: relative;
   flex: 1;
-  min-height: 0;
+  min-height: 280px;
   padding: 0.5rem var(--stack-inset-x) var(--stack-fan-bottom);
   overflow: visible;
 }
@@ -183,12 +183,14 @@
 
 @media (max-width: 767px) {
   .photo-stack__deck {
-    min-height: 240px;
+    min-height: 280px;
     flex: 0 0 auto;
   }
 
   .photo-stack__card {
-    width: min(72vw, 240px);
-    max-height: none;
+    width: 200px;
+    height: 280px;
+    max-height: 280px;
+    aspect-ratio: unset;
   }
 }

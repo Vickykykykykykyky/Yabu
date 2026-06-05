@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { resolvePhotoUrl } from '../utils/photos'
+import { alternatePhotoProxyUrl, resolvePhotoUrl } from '../utils/photos'
 import './UserPhotoCarousel.css'
 
 const MAX_VISIBLE = 5
@@ -35,6 +35,8 @@ type Props = {
   photoIds?: string[]
   label: string
   isOwn?: boolean
+  activeIndex?: number
+  onActiveIndexChange?: (index: number) => void
   onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number, photoIds?: string[], isOwn?: boolean) => void
 }
 
@@ -47,12 +49,32 @@ function arePhotoPropsEqual(
   if (a.photos.some((url, i) => url !== b.photos[i])) return false
   if (a.captions?.length !== b.captions?.length) return false
   if (a.captions?.some((c, i) => c !== b.captions?.[i])) return false
+  if (a.activeIndex !== b.activeIndex) return false
   return true
 }
 
-export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, captions, photoIds, label, isOwn, onViewPhoto }: Props) {
-  const [index, setIndex] = useState(0)
+export const UserPhotoCarousel = memo(function UserPhotoCarousel({
+  photos,
+  captions,
+  photoIds,
+  label,
+  isOwn,
+  activeIndex: controlledIndex,
+  onActiveIndexChange,
+  onViewPhoto,
+}: Props) {
+  const [internalIndex, setInternalIndex] = useState(0)
+  const index = controlledIndex ?? internalIndex
+  const setIndex = useCallback(
+    (next: number | ((prev: number) => number)) => {
+      const resolved = typeof next === 'function' ? next(controlledIndex ?? internalIndex) : next
+      onActiveIndexChange?.(resolved)
+      if (controlledIndex === undefined) setInternalIndex(resolved)
+    },
+    [controlledIndex, internalIndex, onActiveIndexChange],
+  )
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
+  const [displaySrc, setDisplaySrc] = useState<Record<string, string>>({})
 
   const resolvedPhotos = useMemo(() => photos.map(resolvePhotoUrl), [photos])
 
@@ -68,27 +90,34 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, capti
   const hiddenCount = visible.length > MAX_VISIBLE ? visible.length - MAX_VISIBLE : 0
 
   useEffect(() => {
-    setIndex(0)
+    if (controlledIndex === undefined) setInternalIndex(0)
     setHidden(new Set())
+    setDisplaySrc({})
   }, [photos])
 
   useEffect(() => {
     if (index >= visible.length) {
       setIndex(Math.max(0, visible.length - 1))
     }
-  }, [index, visible.length])
+  }, [index, visible.length, setIndex])
 
   const go = useCallback(
     (delta: number) => {
       if (visible.length <= 1) return
       setIndex((i) => (i + delta + visible.length) % visible.length)
     },
-    [visible.length],
+    [visible.length, setIndex],
   )
 
   const onImageError = useCallback((url: string) => {
+    const current = displaySrc[url] ?? url
+    const alt = alternatePhotoProxyUrl(current)
+    if (alt) {
+      setDisplaySrc((prev) => ({ ...prev, [url]: alt }))
+      return
+    }
     setHidden((prev) => new Set(prev).add(url))
-  }, [])
+  }, [displaySrc])
 
   if (photos.length === 0) {
     return <p className="photo-stack__empty">暂无照片</p>
@@ -129,15 +158,18 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, capti
                 transform: getFanTransform(depth, fan),
               }}
               aria-label={isTop ? `当前第 ${index + 1} 张` : `查看第 ${i + 1} 张`}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation()
                 if (isTop) {
                   const originalIndex = resolvedPhotos.indexOf(visible[index])
                   onViewPhoto?.(resolvedPhotos, captions ?? [], originalIndex >= 0 ? originalIndex : 0, photoIds, isOwn)
-                } else setIndex(i)
+                } else {
+                  setIndex(i)
+                }
               }}
             >
               <img
-                src={url}
+                src={displaySrc[url] ?? url}
                 alt=""
                 loading={isTop ? 'eager' : 'lazy'}
                 decoding="async"
@@ -161,7 +193,10 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, capti
               type="button"
               className="photo-stack__nav photo-stack__nav--prev"
               aria-label="上一张"
-              onClick={() => go(-1)}
+              onClick={(e) => {
+                e.stopPropagation()
+                go(-1)
+              }}
             >
               ‹
             </button>
@@ -169,7 +204,10 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({ photos, capti
               type="button"
               className="photo-stack__nav photo-stack__nav--next"
               aria-label="下一张"
-              onClick={() => go(1)}
+              onClick={(e) => {
+                e.stopPropagation()
+                go(1)
+              }}
             >
               ›
             </button>

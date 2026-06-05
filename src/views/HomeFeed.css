@@ -50,5 +50,6 @@
   .user-column {
     min-height: 340px;
     height: auto;
+    overflow: visible;
   }
 }
