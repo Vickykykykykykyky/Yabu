@@ -3,6 +3,7 @@ import { loadLocalUsers, saveLocalUsers } from '../lib/local-users'
 import { checkR2Health, deleteUserPhoto, isR2Enabled, listUserPhotos } from '../lib/r2-api'
 import {
   deletePhotoInDb,
+  deletePostInDb,
   fetchAllProfiles,
   fetchUnreadNotificationCount,
   insertPhotoInDb,
@@ -470,6 +471,45 @@ export function useAppState(loggedInUserId: string) {
     })
   }, [state.users])
 
+  // 批量删除作品下所有照片：R2 + 数据库 + 本地状态一次完成
+  const removePost = useCallback(async (userId: string, postId: string, photoIds: string[], photoUrls: string[]) => {
+    // 1. 删除 R2 存储中所有照片文件
+    for (const url of photoUrls) {
+      if (isR2Enabled() && url) {
+        try {
+          await deleteUserPhoto(userId, url)
+        } catch {
+          // 单张 R2 删除失败不影响其他照片
+        }
+      }
+    }
+
+    // 2. 一次性删除数据库记录（通过 RPC 校验归属）
+    if (isSupabaseEnabled()) {
+      try {
+        await deletePostInDb(postId, userId)
+      } catch (err) {
+        setPersistWarning(`删除作品失败：${formatSupabaseError(err)}`)
+        throw err
+      }
+    }
+
+    // 3. 更新本地状态：移除照片 + 移除帖子
+    setState((prev) => {
+      const photoIdSet = new Set(photoIds)
+      const nextUsers = prev.users.map((u) => {
+        if (u.id !== userId) return u
+        return {
+          ...u,
+          photos: u.photos.filter((p) => !photoIdSet.has(p.id)),
+          posts: (u.posts ?? []).filter((p) => p.id !== postId),
+        }
+      })
+      if (!isSupabaseEnabled()) saveLocalUsers(nextUsers)
+      return { ...prev, users: nextUsers }
+    })
+  }, [isR2Enabled, isSupabaseEnabled])
+
   const updatePhotoCaption = useCallback(async (userId: string, photoId: string, caption: string) => {
     setState((prev) => {
       const nextUsers = prev.users.map((u) => {
@@ -565,6 +605,7 @@ export function useAppState(loggedInUserId: string) {
     addPhoto,
     addPost,
     removePhoto,
+    removePost,
     updatePhotoCaption,
     toggleLike,
     toggleFavorite,

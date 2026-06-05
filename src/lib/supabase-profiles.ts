@@ -458,6 +458,14 @@ export async function deletePhotoInDb(photoId: string, profileId: string) {
   if (error) throw error
 }
 
+// 通过 security definer RPC 批量删除作品下所有照片，校验 profile_id 归属
+export async function deletePostInDb(postId: string, profileId: string) {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .rpc('delete_own_post', { p_post_id: postId, p_profile_id: profileId })
+  if (error) throw error
+}
+
 export async function insertPostInDb(
   profileId: string,
   title?: string,

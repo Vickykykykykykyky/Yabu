@@ -117,6 +117,7 @@ function AuthenticatedApp({
     updateUser,
     addPost,
     removePhoto,
+    removePost,
     updatePhotoCaption,
     toggleLike,
     toggleFavorite,
@@ -256,11 +257,13 @@ function AuthenticatedApp({
     })
   }, [])
 
-  const handleDeletePost = useCallback(async (post: { photos: { id: string }[] }) => {
-    for (const ph of post.photos) {
-      await removePhoto(currentUserId, ph.id)
-    }
-  }, [currentUserId, removePhoto])
+  // 删除一组作品：批量走 RPC，不再逐张遍历
+  const handleDeletePost = useCallback(async (post: { id: string; photos: { id: string; url: string }[] }) => {
+    if (!currentUserId) return
+    const photoIds = post.photos.map((p) => p.id)
+    const photoUrls = post.photos.map((p) => p.url)
+    await removePost(currentUserId, post.id, photoIds, photoUrls)
+  }, [currentUserId, removePost])
 
   const handleNavigate = useCallback((view: NavView) => {
     if (view === 'profile') setViewingUserId(null)
