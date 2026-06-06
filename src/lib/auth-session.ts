@@ -1,6 +1,8 @@
 export type AuthSession = {
   profileId: string
   displayName: string
+  mustChangePassword?: boolean
+  authUserId?: string
 }
 
 const SESSION_KEY = 'yabu-auth-session'

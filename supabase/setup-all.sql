@@ -2,7 +2,11 @@
 -- 在 https://supabase.com/dashboard/project/pmajmgryddjdgstpfcfn/sql/new 粘贴整文件并 Run
 
 -- ========== migration: initial_schema ==========
-create type public.app_role as enum ('member', 'admin');
+do $$ begin
+  create type public.app_role as enum ('member', 'admin');
+exception
+  when duplicate_object then null;
+end $$;
 
 create table if not exists public.profiles (
   id text primary key,
@@ -346,7 +350,7 @@ grant insert on public.follows to authenticated;
 grant delete on public.follows to authenticated;
 grant execute on function public.is_admin() to authenticated;
 
--- ========== seed ==========
+-- ========== seed（可选，仅全新空库时使用；不会覆盖已有用户昵称）==========
 insert into public.profiles (id, display_name, avatar_url, role)
 values
   ('user-1', '小蓝', '', 'member'),
@@ -355,9 +359,7 @@ values
   ('user-4', '小红', '', 'member'),
   ('user-5', '小紫', '', 'member'),
   ('user-6', '小黄', '', 'member')
-on conflict (id) do update set
-  display_name = excluded.display_name,
-  role = excluded.role;
+on conflict (id) do nothing;
 
 -- ========== Storage：公开桶 yabu-photos（不上传会报 Bucket not found）==========
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UserProfile } from '../types'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { normalizePhotoUrls, resolvePhotoUrl } from '../utils/photos'
 import { isSupabaseEnabled } from '../lib/supabase'
 import { getSupabase } from '../lib/supabase'
@@ -30,12 +31,15 @@ function postIndexForPhotoIndex(postCount: number, postLengths: number[], photoI
 }
 
 export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUser, onToggleLike, onToggleFavorite }: Props) {
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const showSpread = Boolean(isFullWidth && !isMobile)
   const posts = useMemo(
     () => (user.posts ?? []).filter((p) => p.photos.length > 0),
     [user.posts],
   )
   const [postIndex, setPostIndex] = useState(0)
   const [carouselIndex, setCarouselIndex] = useState(0)
+  const [postPhotoIndex, setPostPhotoIndex] = useState(0)
 
   const postStartIndices = useMemo(() => {
     const starts: number[] = []
@@ -52,11 +56,18 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
   useEffect(() => {
     setPostIndex(0)
     setCarouselIndex(0)
+    setPostPhotoIndex(0)
   }, [user.id, posts.length])
+
+  useEffect(() => {
+    setPostPhotoIndex(0)
+  }, [postIndex, isFullWidth, isMobile])
 
   const activePost = posts[postIndex] ?? posts[0]
   const stackPhotos = useMemo(() => posts.flatMap((p) => p.photos), [posts])
-  const displayPhotos = isFullWidth ? (activePost?.photos ?? user.photos) : stackPhotos
+  const groupPhotos = activePost?.photos ?? user.photos
+  const carouselSourcePhotos = showSpread ? [] : (isFullWidth && isMobile ? groupPhotos : stackPhotos)
+  const displayPhotos = showSpread ? groupPhotos : carouselSourcePhotos
   const photos = normalizePhotoUrls(displayPhotos.map((p) => resolvePhotoUrl(p.url)))
   const captions = displayPhotos.map((p) => p.caption)
   const photoIds = displayPhotos.map((p) => p.id)
@@ -65,22 +76,32 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
 
   const handleCarouselIndexChange = useCallback(
     (visibleIdx: number) => {
-      const flatIdx = Math.max(0, displayPhotos.length - 1 - visibleIdx)
+      if (isFullWidth && isMobile) {
+        setPostPhotoIndex(Math.max(0, groupPhotos.length - 1 - visibleIdx))
+        return
+      }
+      const flatIdx = Math.max(0, stackPhotos.length - 1 - visibleIdx)
       setCarouselIndex(flatIdx)
       setPostIndex(postIndexForPhotoIndex(posts.length, postLengths, flatIdx))
     },
-    [displayPhotos.length, postLengths, posts.length],
+    [groupPhotos.length, isFullWidth, isMobile, postLengths, posts.length, stackPhotos.length],
   )
 
   const carouselVisibleIndex =
-    displayPhotos.length > 0 ? displayPhotos.length - 1 - carouselIndex : 0
+    displayPhotos.length > 0
+      ? displayPhotos.length - 1 - (isFullWidth && isMobile ? postPhotoIndex : carouselIndex)
+      : 0
 
   const handlePostNav = useCallback(
     (i: number) => {
       setPostIndex(i)
-      setCarouselIndex(postStartIndices[i] ?? 0)
+      if (isFullWidth && isMobile) {
+        setPostPhotoIndex(0)
+      } else {
+        setCarouselIndex(postStartIndices[i] ?? 0)
+      }
     },
-    [postStartIndices],
+    [isFullWidth, isMobile, postStartIndices],
   )
 
   const [likes, setLikes] = useState<Record<string, boolean>>({})
@@ -163,7 +184,7 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
         <div className="user-column__group-title">{groupTitle}</div>
       )}
 
-      {isFullWidth ? (
+      {showSpread ? (
         <div className="user-column__spread">
           {displayPhotos.map((photo, i) => {
             const { z, scaleNum, left } = getSpreadStyle(i, displayPhotos.length)
@@ -199,13 +220,14 @@ export function UserColumn({ user, isMine, isFullWidth, onViewPhoto, onSelectUse
           photoIds={photoIds}
           label={user.displayName}
           isOwn={isMine}
+          compact={isMobile}
           activeIndex={carouselVisibleIndex}
           onActiveIndexChange={handleCarouselIndexChange}
           onViewPhoto={onViewPhoto}
         />
       )}
 
-      {posts.length > 1 && (
+      {posts.length > 1 && isFullWidth && (
         <div className="user-column__post-nav" role="tablist" aria-label="切换作品组">
           {posts.map((post, i) => (
             <button

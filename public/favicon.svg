@@ -7,8 +7,8 @@
       <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="200" height="200" fill="#FFFFFF"/>
-  <rect width="200" height="200" fill="url(#bg-blue-leak)"/>
+  <rect width="200" height="200" rx="44" fill="#FFFFFF"/>
+  <rect width="200" height="200" rx="44" fill="url(#bg-blue-leak)"/>
   <circle cx="88" cy="100" r="38" fill="#A8E6CF" opacity="0.35"/>
   <circle cx="112" cy="100" r="38" fill="#FFD3B6" opacity="0.38"/>
   <g stroke="#718096" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.55">

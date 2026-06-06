@@ -1,4 +1,4 @@
-import { getSupabase } from './supabase'
+ import { getSupabase } from './supabase'
 import type { Post, UserPhoto, UserProfile, UserRole } from '../types'
 
 type ProfileRow = {
@@ -163,6 +163,76 @@ type RegisterProfileJson = {
 export async function isDisplayNameTaken(displayName: string): Promise<boolean> {
   const profile = await findProfileByDisplayName(displayName)
   return profile !== null
+}
+
+export async function fetchProfileByAuthUserId(authUserId: string): Promise<UserProfile | null> {
+  const row = await fetchProfileRowByAuthUserId(authUserId)
+  if (!row) return null
+  return fetchProfileById(row.id)
+}
+
+/** 登录启动用：只查 id / 昵称，不拉照片 */
+export async function fetchProfileRowByAuthUserId(
+  authUserId: string,
+): Promise<ProfileRow | null> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url, role')
+    .eq('auth_user_id', authUserId)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data as ProfileRow | null) ?? null
+}
+
+export async function isContactEmailTaken(email: string): Promise<boolean> {
+  const profile = await findProfileByContactEmail(email)
+  return profile !== null
+}
+
+export async function findProfileByContactEmail(email: string): Promise<UserProfile | null> {
+  const supabase = getSupabase()
+  const normalized = email.trim().toLowerCase()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url, role')
+    .eq('contact_email', normalized)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+  return rowToProfile(data as ProfileRow)
+}
+
+export async function registerProfileAuthInDb(
+  displayName: string,
+  profileId: string,
+): Promise<UserProfile> {
+  const supabase = getSupabase()
+  const { data, error } = await supabase.rpc('register_profile_auth', {
+    p_display_name: displayName,
+    p_profile_id: profileId,
+  })
+
+  if (error) throw error
+  const row = data as RegisterProfileJson
+  return rowToProfile({
+    id: row.id,
+    display_name: row.display_name,
+    avatar_url: row.avatar_url ?? '',
+    role: row.role ?? 'member',
+  })
+}
+
+export async function updateProfileContactEmail(profileId: string, email: string): Promise<void> {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from('profiles')
+    .update({ contact_email: email.trim().toLowerCase() })
+    .eq('id', profileId)
+
+  if (error) throw error
 }
 
 /** 注册新用户：优先 RPC，回退直连 insert */

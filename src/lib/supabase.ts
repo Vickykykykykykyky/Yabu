@@ -21,7 +21,13 @@ export function getSupabase() {
     throw new Error('未配置 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY')
   }
   if (!client) {
-    client = createClient(url, anonKey)
+    client = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   }
   return client
 }

@@ -1,5 +1,7 @@
 type IconProps = { className?: string }
 
+const LOGO_RADIUS = 44
+
 /** 取景框相机：左上浅蓝流光 + 双重光斑 + 四角定格线 */
 export function IconLogo({ className }: IconProps) {
   return (
@@ -12,8 +14,8 @@ export function IconLogo({ className }: IconProps) {
           <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <rect width="200" height="200" fill="#FFFFFF" />
-      <rect width="200" height="200" fill="url(#bg-blue-leak)" />
+      <rect width="200" height="200" rx={LOGO_RADIUS} fill="#FFFFFF" />
+      <rect width="200" height="200" rx={LOGO_RADIUS} fill="url(#bg-blue-leak)" />
       <circle cx="88" cy="100" r="38" fill="#A8E6CF" opacity="0.35" />
       <circle cx="112" cy="100" r="38" fill="#FFD3B6" opacity="0.38" />
       <g

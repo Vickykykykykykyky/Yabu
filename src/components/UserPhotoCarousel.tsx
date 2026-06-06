@@ -11,14 +11,15 @@ type FanConfig = {
   tyStep: number
 }
 
-function getFanConfig(count: number): FanConfig {
+function getFanConfig(count: number, compact = false): FanConfig {
   if (count <= 1) return { frontRot: 0, rotStep: 0, txStep: 0, tyStep: 0 }
   const scale = 3 / count
+  const k = compact ? 0.35 : 1
   return {
-    frontRot: 8,
-    rotStep: -9 * scale,
-    txStep: -6 * scale,
-    tyStep: -5 * scale,
+    frontRot: 8 * k,
+    rotStep: -9 * scale * k,
+    txStep: -6 * scale * k,
+    tyStep: -5 * scale * k,
   }
 }
 
@@ -35,6 +36,7 @@ type Props = {
   photoIds?: string[]
   label: string
   isOwn?: boolean
+  compact?: boolean
   activeIndex?: number
   onActiveIndexChange?: (index: number) => void
   onViewPhoto?: (photos: string[], captions: (string | undefined)[], index: number, photoIds?: string[], isOwn?: boolean) => void
@@ -50,6 +52,7 @@ function arePhotoPropsEqual(
   if (a.captions?.length !== b.captions?.length) return false
   if (a.captions?.some((c, i) => c !== b.captions?.[i])) return false
   if (a.activeIndex !== b.activeIndex) return false
+  if (a.compact !== b.compact) return false
   return true
 }
 
@@ -59,6 +62,7 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({
   photoIds,
   label,
   isOwn,
+  compact = false,
   activeIndex: controlledIndex,
   onActiveIndexChange,
   onViewPhoto,
@@ -85,8 +89,8 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({
 
   const currentCaption = captions?.[resolvedPhotos.length - 1 - index]
 
-  const cardCount = Math.min(visible.length, MAX_VISIBLE)
-  const fan = getFanConfig(cardCount)
+  const cardCount = Math.min(visible.length, compact ? 3 : MAX_VISIBLE)
+  const fan = getFanConfig(cardCount, compact)
   const hiddenCount = visible.length > MAX_VISIBLE ? visible.length - MAX_VISIBLE : 0
 
   useEffect(() => {
@@ -221,23 +225,18 @@ export const UserPhotoCarousel = memo(function UserPhotoCarousel({
 
       {hasMultiple ? (
         <div className="photo-stack__footer">
-          <div className="photo-stack__footer-row">
-            <div className="photo-stack__dots" role="tablist" aria-label="选择照片">
-              {visible.map((url, i) => (
-                <button
-                  key={url.slice(-48)}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === index}
-                  aria-label={`第 ${i + 1} 张`}
-                  className={`photo-stack__dot ${i === index ? 'photo-stack__dot--active' : ''}`}
-                  onClick={() => setIndex(i)}
-                />
-              ))}
-            </div>
-            <span className="photo-stack__counter">
-              {index + 1} / {visible.length}
-            </span>
+          <div className="photo-stack__dots" role="tablist" aria-label="选择照片">
+            {visible.map((url, i) => (
+              <button
+                key={url.slice(-48)}
+                type="button"
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`第 ${i + 1} 张`}
+                className={`photo-stack__dot ${i === index ? 'photo-stack__dot--active' : ''}`}
+                onClick={() => setIndex(i)}
+              />
+            ))}
           </div>
         </div>
       ) : null}

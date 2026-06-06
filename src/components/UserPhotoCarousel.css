@@ -1,7 +1,7 @@
 .photo-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.15rem;
   flex: 1;
   min-height: 0;
 }
@@ -26,7 +26,7 @@
   position: relative;
   flex: 1;
   min-height: 280px;
-  padding: 0.5rem var(--stack-inset-x) var(--stack-fan-bottom);
+  padding: 0.25rem var(--stack-inset-x) var(--stack-fan-bottom);
   overflow: visible;
 }
 
@@ -130,20 +130,16 @@
 
 .photo-stack__footer {
   flex-shrink: 0;
-  padding-top: 0.15rem;
-}
-
-.photo-stack__footer-row {
+  padding-top: 0.05rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  justify-content: center;
 }
 
 .photo-stack__dots {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  justify-content: center;
 }
 
 .photo-stack__dot {
@@ -162,35 +158,59 @@
   transform: scale(1.25);
 }
 
-.photo-stack__counter {
-  font-size: 0.75rem;
-  color: #6b7280;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-
 .photo-stack__caption {
   margin: 0;
   font-size: 0.85rem;
   color: #525252;
   text-align: center;
-  padding: 0.25rem 0.5rem;
-  line-height: 1.4;
+  padding: 0.1rem 0.5rem 0;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 @media (max-width: 767px) {
+  .photo-stack {
+    gap: 0.1rem;
+  }
+
   .photo-stack__deck {
-    min-height: 280px;
+    --stack-inset-x: 1rem;
+    --stack-fan-bottom: 0.35rem;
+    box-sizing: border-box;
+    min-height: min(62vw * 7 / 5 + 2.5rem, 360px);
     flex: 0 0 auto;
+    overflow: visible;
+    padding: 1.25rem 1rem 0.25rem;
   }
 
   .photo-stack__card {
-    width: 200px;
-    height: 280px;
-    max-height: 280px;
-    aspect-ratio: unset;
+    width: min(66vw, 220px);
+    height: auto;
+    max-height: min(60vw * 7 / 5, 300px);
+    aspect-ratio: 5 / 7;
+  }
+
+  .photo-stack__nav {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.1rem;
+  }
+
+  .photo-stack__nav--prev {
+    left: 0.05rem;
+  }
+
+  .photo-stack__nav--next {
+    right: 0.05rem;
+  }
+
+  .photo-stack__caption {
+    padding-top: 0.05rem;
+  }
+
+  .photo-stack__footer {
+    padding-top: 0.1rem;
   }
 }

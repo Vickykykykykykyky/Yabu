@@ -8,9 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'favicon-32.png', 'favicon-16.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Yabu - 照片分享墙',
+        name: 'Yabu',
         short_name: 'Yabu',
         description: '分享你的照片和生活',
         theme_color: '#1a1a2e',

@@ -1,0 +1,49 @@
+.account-settings {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #fafafa;
+}
+
+.account-settings__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.account-settings__hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.account-settings__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.account-settings__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.account-settings__wechat {
+  margin-top: 0.65rem;
+  width: 100%;
+}
+
+.account-settings__message {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+  color: #059669;
+}
+
+.account-settings__error {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+  color: #dc2626;
+}

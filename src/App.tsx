@@ -22,6 +22,8 @@ import { ProfileView } from './views/ProfileView'
 import { ReelsView } from './views/ReelsView'
 import { SearchView } from './views/SearchView'
 import { AuthPage } from './views/AuthPage'
+import { ChangePasswordPage } from './views/ChangePasswordPage'
+import { OAuthProfileSetupPage } from './views/OAuthProfileSetupPage'
 import { CollectionView } from './views/CollectionView'
 import './App.css'
 
@@ -69,14 +71,57 @@ export default function App() {
     )
   }
 
+  if (auth.needsProfileSetup) {
+    return (
+      <OAuthProfileSetupPage
+        onSubmit={async (name) => {
+          await auth.finishOAuthProfile(name)
+        }}
+        onLogout={auth.logout}
+      />
+    )
+  }
+
   if (!auth.session) {
     return (
       <AuthPage
-        onLogin={async (name) => {
-          await auth.login(name)
+        onLogin={async (name, password) => {
+          await auth.login(name, password)
         }}
-        onRegister={async (name) => {
-          await auth.register(name)
+        onLoginByEmail={async (email, password) => {
+          await auth.loginByEmail(email, password)
+        }}
+        onSendEmailOtp={isSupabaseEnabled() ? auth.sendEmailOtp : undefined}
+        onVerifyEmailOtp={
+          isSupabaseEnabled()
+            ? async (email, token) => {
+                await auth.verifyEmailOtp(email, token)
+              }
+            : undefined
+        }
+        onSendEmailRegisterOtp={isSupabaseEnabled() ? auth.sendEmailRegisterOtp : undefined}
+        onVerifyEmailRegisterOtp={
+          isSupabaseEnabled()
+            ? async (email, token, displayName) => {
+                await auth.verifyEmailRegisterOtp(email, token, displayName)
+              }
+            : undefined
+        }
+        onRegister={async (name, password) => {
+          await auth.register(name, password)
+        }}
+        onWeChatLogin={isSupabaseEnabled() ? auth.loginWeChat : undefined}
+        onGoogleLogin={isSupabaseEnabled() ? auth.loginGoogle : undefined}
+      />
+    )
+  }
+
+  if (auth.session.mustChangePassword) {
+    return (
+      <ChangePasswordPage
+        displayName={auth.session.displayName}
+        onSubmit={async (current, next) => {
+          await auth.updatePassword(current, next)
         }}
       />
     )
@@ -88,6 +133,8 @@ export default function App() {
       profileId={auth.session.profileId}
       displayName={auth.session.displayName}
       onLogout={auth.logout}
+      onLinkEmail={auth.linkEmail}
+      onWeChatLogin={isSupabaseEnabled() ? auth.loginWeChat : undefined}
       activeView={activeView}
       setActiveView={setActiveView}
     />
@@ -97,7 +144,9 @@ export default function App() {
 type AuthenticatedProps = {
   profileId: string
   displayName: string
-  onLogout: () => void
+  onLogout: () => void | Promise<void>
+  onLinkEmail: (email: string, password: string) => Promise<void>
+  onWeChatLogin?: () => Promise<void>
   activeView: NavView
   setActiveView: (view: NavView) => void
 }
@@ -106,6 +155,8 @@ function AuthenticatedApp({
   profileId,
   displayName,
   onLogout,
+  onLinkEmail,
+  onWeChatLogin,
   activeView,
   setActiveView,
 }: AuthenticatedProps) {
@@ -361,7 +412,9 @@ function AuthenticatedApp({
                 onUpdateName={isOwn ? ((id: string, name: string) => updateUser(id, { displayName: name })) : undefined}
                 onToggleLike={toggleLike}
                 onToggleFavorite={toggleFavorite}
-                onLogout={isOwn ? onLogout : undefined}
+                onLogout={isOwn ? () => void onLogout() : undefined}
+                onLinkEmail={isOwn ? onLinkEmail : undefined}
+                onWeChatLogin={isOwn ? onWeChatLogin : undefined}
               />
             )
           })()}

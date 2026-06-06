@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { loadLocalUsers, saveLocalUsers } from '../lib/local-users'
+import { loadLocalUsers, saveLocalUserProfiles } from '../lib/local-users'
 import { checkR2Health, deleteUserPhoto, isR2Enabled } from '../lib/r2-api'
 import {
   deletePhotoInDb,
@@ -309,7 +309,7 @@ export function useAppState(loggedInUserId: string) {
   const updateUser = useCallback((id: string, patch: Partial<UserProfile>) => {
     setState((prev) => {
       const users = prev.users.map((u) => (u.id === id ? { ...u, ...patch } : u))
-      if (!isSupabaseEnabled()) saveLocalUsers(users)
+      if (!isSupabaseEnabled()) saveLocalUserProfiles(users)
       return { ...prev, users }
     })
 
@@ -347,7 +347,7 @@ export function useAppState(loggedInUserId: string) {
           : u,
       )
       if (!isSupabaseEnabled()) {
-        saveLocalUsers(nextUsers)
+        saveLocalUserProfiles(nextUsers)
       }
       return {
         ...prev,
@@ -421,7 +421,7 @@ export function useAppState(loggedInUserId: string) {
       })
 
       if (!isSupabaseEnabled()) {
-        saveLocalUsers(nextUsers)
+        saveLocalUserProfiles(nextUsers)
       }
 
       return {
@@ -463,7 +463,7 @@ export function useAppState(loggedInUserId: string) {
         u.id === userId ? removePhotoById(u, photoId) : u,
       )
       if (!isSupabaseEnabled()) {
-        saveLocalUsers(nextUsers)
+        saveLocalUserProfiles(nextUsers)
       }
       return { ...prev, users: nextUsers }
     })
@@ -503,7 +503,7 @@ export function useAppState(loggedInUserId: string) {
           posts: (u.posts ?? []).filter((p) => p.id !== postId),
         }
       })
-      if (!isSupabaseEnabled()) saveLocalUsers(nextUsers)
+      if (!isSupabaseEnabled()) saveLocalUserProfiles(nextUsers)
       return { ...prev, users: nextUsers }
     })
 
@@ -528,7 +528,7 @@ export function useAppState(loggedInUserId: string) {
         return { ...u, photos: nextPhotos, posts: nextPosts }
       })
       if (!isSupabaseEnabled()) {
-        saveLocalUsers(nextUsers)
+        saveLocalUserProfiles(nextUsers)
       }
       return { ...prev, users: nextUsers }
     })

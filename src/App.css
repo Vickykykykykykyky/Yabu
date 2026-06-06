@@ -67,6 +67,7 @@
   width: 1.85rem;
   height: 1.85rem;
   flex-shrink: 0;
+  border-radius: 22%;
 }
 
 .app__logo {
@@ -106,7 +107,7 @@
 
 @media (max-width: 767px) {
   .app__main {
-    padding: 0.75rem 0.85rem 5.5rem;
+    padding: 0.75rem 0.85rem calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .app__header {

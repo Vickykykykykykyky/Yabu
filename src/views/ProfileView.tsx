@@ -2,6 +2,7 @@ import { useCallback, useMemo, useReducer, useState } from 'react'
 import type { Post, UserPhoto, UserProfile } from '../types'
 import { resolvePhotoUrl } from '../utils/photos'
 import './MediaViews.css'
+import { AccountSettings } from '../components/AccountSettings'
 
 type EditState = { photoId: string | null; value: string }
 
@@ -35,6 +36,8 @@ type Props = {
   onToggleLike?: (postId: string) => Promise<boolean | null>
   onToggleFavorite?: (postId: string) => Promise<boolean | null>
   onLogout?: () => void
+  onLinkEmail?: (email: string, password: string) => Promise<void>
+  onWeChatLogin?: () => Promise<void>
 }
 
 function getInitials(name: string) {
@@ -52,6 +55,8 @@ export function ProfileView({
   onToggleLike,
   onToggleFavorite,
   onLogout,
+  onLinkEmail,
+  onWeChatLogin,
 }: Props) {
   const followerCount = user.followerCount ?? 0
   const isOwn = !!onAvatarPick
@@ -304,6 +309,10 @@ export function ProfileView({
           )}
         </div>
       </section>
+
+      {isOwn && onLinkEmail && (
+        <AccountSettings onLinkEmail={onLinkEmail} onWeChatLogin={onWeChatLogin} />
+      )}
 
       {onLogout && (
         <button type="button" className="profile-view__logout" onClick={onLogout}>

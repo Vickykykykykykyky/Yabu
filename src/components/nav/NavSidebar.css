@@ -40,6 +40,10 @@
   flex-shrink: 0;
 }
 
+.nav-sidebar__logo .nav-sidebar__icon {
+  border-radius: 22%;
+}
+
 .nav-sidebar__logo:hover {
   background: #fafafa;
 }
