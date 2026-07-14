@@ -457,7 +457,7 @@ function AuthenticatedApp({
                 onUpdateName={isOwn ? ((id: string, name: string) => updateUser(id, { displayName: name })) : undefined}
                 onToggleLike={toggleLike}
                 onToggleFavorite={toggleFavorite}
-                onLogout={isOwn ? () => void onLogout() : undefined}
+                onLogout={isOwn && onLogout ? () => void onLogout() : undefined}
                 onLinkEmail={isOwn ? onLinkEmail : undefined}
                 onWeChatLogin={isOwn ? onWeChatLogin : undefined}
               />
