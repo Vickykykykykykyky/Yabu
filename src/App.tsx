@@ -25,6 +25,7 @@ import { AuthPage } from './views/AuthPage'
 import { ChangePasswordPage } from './views/ChangePasswordPage'
 import { OAuthProfileSetupPage } from './views/OAuthProfileSetupPage'
 import { CollectionView } from './views/CollectionView'
+import { Button } from './components/ui/button'
 import './App.css'
 
 const VIEW_TITLES: Record<NavView, string> = {
@@ -41,6 +42,7 @@ const VIEW_TITLES: Record<NavView, string> = {
 
 export default function App() {
   const auth = useAuth()
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const [activeView, setActiveView] = useState<NavView>(() => {
     const hash = window.location.hash.replace('#', '')
     const valid: NavView[] = ['home', 'reels', 'messages', 'search', 'explore', 'notifications', 'profile', 'likes', 'favorites']
@@ -63,6 +65,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
+  useEffect(() => {
+    if (auth.session && !auth.session.mustChangePassword && showAuthModal) {
+      setShowAuthModal(false)
+    }
+  }, [auth.session, showAuthModal])
+
   if (auth.booting) {
     return (
       <div className="app app--auth-loading">
@@ -82,41 +90,7 @@ export default function App() {
     )
   }
 
-  if (!auth.session) {
-    return (
-      <AuthPage
-        onLogin={async (name, password) => {
-          await auth.login(name, password)
-        }}
-        onLoginByEmail={async (email, password) => {
-          await auth.loginByEmail(email, password)
-        }}
-        onSendEmailOtp={isSupabaseEnabled() ? auth.sendEmailOtp : undefined}
-        onVerifyEmailOtp={
-          isSupabaseEnabled()
-            ? async (email, token) => {
-                await auth.verifyEmailOtp(email, token)
-              }
-            : undefined
-        }
-        onSendEmailRegisterOtp={isSupabaseEnabled() ? auth.sendEmailRegisterOtp : undefined}
-        onVerifyEmailRegisterOtp={
-          isSupabaseEnabled()
-            ? async (email, token, displayName) => {
-                await auth.verifyEmailRegisterOtp(email, token, displayName)
-              }
-            : undefined
-        }
-        onRegister={async (name, password) => {
-          await auth.register(name, password)
-        }}
-        onWeChatLogin={isSupabaseEnabled() ? auth.loginWeChat : undefined}
-        onGoogleLogin={isSupabaseEnabled() ? auth.loginGoogle : undefined}
-      />
-    )
-  }
-
-  if (auth.session.mustChangePassword) {
+  if (auth.session?.mustChangePassword) {
     return (
       <ChangePasswordPage
         displayName={auth.session.displayName}
@@ -127,25 +101,76 @@ export default function App() {
     )
   }
 
+  const isGuest = !auth.session
+
   return (
-    <AuthenticatedApp
-      key={auth.session.profileId}
-      profileId={auth.session.profileId}
-      displayName={auth.session.displayName}
-      onLogout={auth.logout}
-      onLinkEmail={auth.linkEmail}
-      onWeChatLogin={isSupabaseEnabled() ? auth.loginWeChat : undefined}
-      activeView={activeView}
-      setActiveView={setActiveView}
-    />
+    <>
+      <AuthenticatedApp
+        key={auth.session?.profileId ?? 'guest'}
+        profileId={auth.session?.profileId ?? ''}
+        displayName={auth.session?.displayName ?? ''}
+        isGuest={isGuest}
+        onLoginClick={isSupabaseEnabled() ? () => setShowAuthModal(true) : undefined}
+        onLogout={isGuest ? undefined : auth.logout}
+        onLinkEmail={isGuest ? undefined : auth.linkEmail}
+        onWeChatLogin={isSupabaseEnabled() ? auth.loginWeChat : undefined}
+        activeView={activeView}
+        setActiveView={setActiveView}
+      />
+      {showAuthModal && (
+        <div className="auth-modal-overlay" onClick={() => setShowAuthModal(false)}>
+          <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="auth-modal__close"
+              onClick={() => setShowAuthModal(false)}
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+            <AuthPage
+              onLogin={async (name, password) => {
+                await auth.login(name, password)
+              }}
+              onLoginByEmail={async (email, password) => {
+                await auth.loginByEmail(email, password)
+              }}
+              onSendEmailOtp={isSupabaseEnabled() ? auth.sendEmailOtp : undefined}
+              onVerifyEmailOtp={
+                isSupabaseEnabled()
+                  ? async (email, token) => {
+                      await auth.verifyEmailOtp(email, token)
+                    }
+                  : undefined
+              }
+              onSendEmailRegisterOtp={isSupabaseEnabled() ? auth.sendEmailRegisterOtp : undefined}
+              onVerifyEmailRegisterOtp={
+                isSupabaseEnabled()
+                  ? async (email, token, displayName) => {
+                      await auth.verifyEmailRegisterOtp(email, token, displayName)
+                    }
+                  : undefined
+              }
+              onRegister={async (name, password) => {
+                await auth.register(name, password)
+              }}
+              onWeChatLogin={isSupabaseEnabled() ? auth.loginWeChat : undefined}
+              onGoogleLogin={isSupabaseEnabled() ? auth.loginGoogle : undefined}
+            />
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
 type AuthenticatedProps = {
   profileId: string
   displayName: string
-  onLogout: () => void | Promise<void>
-  onLinkEmail: (email: string, password: string) => Promise<void>
+  isGuest?: boolean
+  onLoginClick?: () => void
+  onLogout?: () => void | Promise<void>
+  onLinkEmail?: (email: string, password: string) => Promise<void>
   onWeChatLogin?: () => Promise<void>
   activeView: NavView
   setActiveView: (view: NavView) => void
@@ -154,6 +179,8 @@ type AuthenticatedProps = {
 function AuthenticatedApp({
   profileId,
   displayName,
+  isGuest = false,
+  onLoginClick,
   onLogout,
   onLinkEmail,
   onWeChatLogin,
@@ -342,18 +369,36 @@ function AuthenticatedApp({
         activeUser={activeUser}
         unreadCount={unreadCount}
         onMarkNotificationsRead={markNotificationsRead}
-        onLogout={onLogout}
+        onLogout={isGuest ? undefined : onLogout}
+        isGuest={isGuest}
+        onLoginClick={onLoginClick}
       />
 
       <main className={`app__main ${activeView === 'home' ? 'app__main--home' : ''}`}>
         <header className="app__header">
-          <div className="app__header-title">
-            <IconLogo className="app__header-logo" />
-            <h1 className="app__logo">{pageTitle}</h1>
+          <div className="app__header-row">
+            <div className="app__header-title">
+              <IconLogo className="app__header-logo" />
+              <h1 className="app__logo">{pageTitle}</h1>
+            </div>
+            {isGuest && (
+              <Button
+                type="button"
+                className="app__login-btn"
+                onClick={onLoginClick}
+              >
+                登录
+              </Button>
+            )}
           </div>
-          {activeView === 'home' && (
+          {activeView === 'home' && !isGuest && (
             <p className="app__subtitle">
               你好，{displayName} · 点击右侧 + 上传到你的照片墙
+            </p>
+          )}
+          {activeView === 'home' && isGuest && (
+            <p className="app__subtitle">
+              欢迎来到 Yabu · 登录后即可上传你的照片墙
             </p>
           )}
         </header>
@@ -366,7 +411,7 @@ function AuthenticatedApp({
               <p className="app__loading-users">加载照片墙…</p>
             ) : users.length === 0 ? (
               <p className="app__empty-users">
-                还没有其他用户，点击 + 上传你的第一张照片吧
+                {isGuest ? '还没有用户上传照片，登录后成为第一个吧' : '还没有其他用户，点击 + 上传你的第一张照片吧'}
               </p>
             ) : (
               <HomeFeed users={shuffledUsers} currentUserId={currentUserId} onViewPhoto={handleViewPhoto} onSelectUser={selectUser} onToggleLike={toggleLike} onToggleFavorite={toggleFavorite} />

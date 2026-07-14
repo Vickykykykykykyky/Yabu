@@ -20,7 +20,9 @@ type Props = {
   activeUser: UserProfile
   unreadCount: number
   onMarkNotificationsRead: () => void
-  onLogout: () => void
+  onLogout?: () => void
+  isGuest?: boolean
+  onLoginClick?: () => void
 }
 
 const NAV_ITEMS: { id: NavView; label: string; Icon: typeof IconHome }[] = [
@@ -32,6 +34,13 @@ const NAV_ITEMS: { id: NavView; label: string; Icon: typeof IconHome }[] = [
   { id: 'notifications', label: '通知', Icon: IconHeart },
   { id: 'likes', label: '点赞', Icon: IconHeart },
   { id: 'favorites', label: '收藏', Icon: IconHeart },
+]
+
+const GUEST_NAV_ITEMS: { id: NavView; label: string; Icon: typeof IconHome }[] = [
+  { id: 'home', label: '首页', Icon: IconHome },
+  { id: 'reels', label: '短视频', Icon: IconReels },
+  { id: 'search', label: '搜索', Icon: IconSearch },
+  { id: 'explore', label: '发现', Icon: IconExplore },
 ]
 
 function getInitials(name: string) {
@@ -46,6 +55,8 @@ export function NavSidebar({
   unreadCount,
   onMarkNotificationsRead,
   onLogout,
+  isGuest = false,
+  onLoginClick,
 }: Props) {
   const [hovered, setHovered] = useState(false)
   const [pinned, setPinned] = useState(false)
@@ -60,6 +71,8 @@ export function NavSidebar({
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
   }, [pinned])
+
+  const items = isGuest ? GUEST_NAV_ITEMS : NAV_ITEMS
 
   return (
     <aside
@@ -80,7 +93,7 @@ export function NavSidebar({
       </button>
 
       <nav className="nav-sidebar__nav">
-        {NAV_ITEMS.map(({ id, label, Icon }) => (
+        {items.map(({ id, label, Icon }) => (
           <button
             key={id}
             type="button"
@@ -105,49 +118,70 @@ export function NavSidebar({
           </button>
         ))}
 
-        <button
-          type="button"
-          className="nav-sidebar__item"
-          onClick={onCreate}
-          aria-label="创建"
-          title={!expanded ? '创建' : undefined}
-        >
-          <span className="nav-sidebar__icon-wrap">
-            <IconCreate className="nav-sidebar__icon" />
-          </span>
-          <span className="nav-sidebar__label">创建</span>
-        </button>
+        {!isGuest && (
+          <button
+            type="button"
+            className="nav-sidebar__item"
+            onClick={onCreate}
+            aria-label="创建"
+            title={!expanded ? '创建' : undefined}
+          >
+            <span className="nav-sidebar__icon-wrap">
+              <IconCreate className="nav-sidebar__icon" />
+            </span>
+            <span className="nav-sidebar__label">创建</span>
+          </button>
+        )}
       </nav>
 
-      <button
-        type="button"
-        className={`nav-sidebar__user ${activeView === 'profile' ? 'nav-sidebar__user--active' : ''}`}
-        onClick={() => onNavigate('profile')}
-        aria-current={activeView === 'profile' ? 'page' : undefined}
-        title={!expanded ? activeUser.displayName : undefined}
-      >
-        <span className="nav-sidebar__user-avatar">
-          {activeUser.avatarUrl ? (
-            <img src={activeUser.avatarUrl} alt="" />
-          ) : (
-            <span>{getInitials(activeUser.displayName)}</span>
-          )}
-        </span>
-        <span className="nav-sidebar__user-name">{activeUser.displayName}</span>
-      </button>
+      {isGuest ? (
+        <button
+          type="button"
+          className="nav-sidebar__item nav-sidebar__login"
+          onClick={onLoginClick}
+          title={!expanded ? '登录' : undefined}
+          aria-label="登录"
+        >
+          <span className="nav-sidebar__icon-wrap">
+            <IconLogout className="nav-sidebar__icon" />
+          </span>
+          <span className="nav-sidebar__label">登录</span>
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            className={`nav-sidebar__user ${activeView === 'profile' ? 'nav-sidebar__user--active' : ''}`}
+            onClick={() => onNavigate('profile')}
+            aria-current={activeView === 'profile' ? 'page' : undefined}
+            title={!expanded ? activeUser.displayName : undefined}
+          >
+            <span className="nav-sidebar__user-avatar">
+              {activeUser.avatarUrl ? (
+                <img src={activeUser.avatarUrl} alt="" />
+              ) : (
+                <span>{getInitials(activeUser.displayName)}</span>
+              )}
+            </span>
+            <span className="nav-sidebar__user-name">{activeUser.displayName}</span>
+          </button>
 
-      <button
-        type="button"
-        className="nav-sidebar__item nav-sidebar__logout"
-        onClick={onLogout}
-        title={!expanded ? '退出登录' : undefined}
-        aria-label="退出登录"
-      >
-        <span className="nav-sidebar__icon-wrap">
-          <IconLogout className="nav-sidebar__icon" />
-        </span>
-        <span className="nav-sidebar__label">退出登录</span>
-      </button>
+          {onLogout && (
+            <button
+              type="button"
+              className="nav-sidebar__item nav-sidebar__logout"
+              onClick={onLogout}
+              title={!expanded ? '退出登录' : undefined}
+              aria-label="退出登录"
+            >
+              <span className="nav-sidebar__icon-wrap">
+                <IconLogout className="nav-sidebar__icon" />
+              </span>
+              <span className="nav-sidebar__label">退出登录</span>
+            </button>
+          )}
+        </>
+      )}
     </aside>
   )
 }
